@@ -74,6 +74,24 @@ class ScenarioGenerator:
                     logger.warning(f"Direct JSON parse failed, trying extraction: {e}")
                     scenario = self._extract_json(text)
                 
+                # Normalize indicator values to ensure they're in valid ranges
+                if "market_context" in scenario and "key_indicators" in scenario["market_context"]:
+                    for asset, indicators in scenario["market_context"]["key_indicators"].items():
+                        if isinstance(indicators, dict):
+                            # Clamp momentum_24h to [-1.0, 1.0]
+                            if "momentum_24h" in indicators:
+                                indicators["momentum_24h"] = max(-1.0, min(1.0, float(indicators["momentum_24h"])))
+                            # Clamp RSI to [0.0, 100.0]
+                            if "rsi" in indicators:
+                                indicators["rsi"] = max(0.0, min(100.0, float(indicators["rsi"])))
+                            # Clamp ATR to [0.0, 50.0]
+                            if "atr_pct" in indicators:
+                                indicators["atr_pct"] = max(0.0, min(50.0, float(indicators["atr_pct"])))
+                
+                # Normalize leverage
+                if "account_state" in scenario and "leverage" in scenario["account_state"]:
+                    scenario["account_state"]["leverage"] = max(1.0, min(100.0, float(scenario["account_state"]["leverage"])))
+                
                 # Add metadata
                 scenario["_metadata"] = {
                     "generated_at": None,  # Will be set by pipeline

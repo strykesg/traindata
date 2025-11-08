@@ -110,24 +110,32 @@ class WorkerPool:
     async def _scale_workers(self, target_count: int, process_fn: Optional[Callable] = None):
         """Scale workers to target count."""
         async with self.scale_lock:
+            # Enforce max_workers limit strictly
             target_count = max(self.config.min_workers, min(target_count, self.config.max_workers))
             
-            current_count = len([w for w in self.workers if not w.done()])
+            # Get active workers only
+            active_workers = [w for w in self.workers if not w.done()]
+            current_count = len(active_workers)
             
             if target_count > current_count:
                 # Scale up - only if we have a process function
                 if process_fn is None:
                     # Can't scale up without process function, just update count
                     self.current_worker_count = target_count
-                    self.metrics.current_workers = target_count
+                    self.metrics.current_workers = current_count
                     return
                 
-                # Scale up
-                for i in range(current_count, target_count):
+                # Scale up - but don't exceed max_workers
+                to_add = min(target_count - current_count, self.config.max_workers - current_count)
+                if to_add <= 0:
+                    logger.warning(f"Cannot scale up: already at max_workers ({self.config.max_workers})")
+                    return
+                
+                for i in range(to_add):
                     worker_id = len(self.workers) + 1
                     worker = asyncio.create_task(self._worker(worker_id, process_fn))
                     self.workers.append(worker)
-                    logger.info(f"Scaling up: added worker {worker_id} (total: {len(self.workers)})")
+                    logger.info(f"Scaling up: added worker {worker_id} (active: {current_count + i + 1}/{self.config.max_workers})")
             
             elif target_count < current_count:
                 # Scale down (let workers finish naturally)

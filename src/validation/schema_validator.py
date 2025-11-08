@@ -8,10 +8,35 @@ logger = logging.getLogger(__name__)
 
 
 class MarketIndicator(BaseModel):
-    """Market indicator model."""
-    momentum_24h: float = Field(..., ge=-1.0, le=1.0)
-    rsi: float = Field(..., ge=0.0, le=100.0)
-    atr_pct: float = Field(..., ge=0.0, le=50.0)
+    """Market indicator model with value normalization."""
+    momentum_24h: float
+    rsi: float
+    atr_pct: float
+    
+    @classmethod
+    def normalize_momentum(cls, v: float) -> float:
+        """Normalize momentum to [-1.0, 1.0] range."""
+        return max(-1.0, min(1.0, float(v)))
+    
+    @classmethod
+    def normalize_rsi(cls, v: float) -> float:
+        """Normalize RSI to [0.0, 100.0] range."""
+        return max(0.0, min(100.0, float(v)))
+    
+    @classmethod
+    def normalize_atr(cls, v: float) -> float:
+        """Normalize ATR to [0.0, 50.0] range."""
+        return max(0.0, min(50.0, float(v)))
+    
+    def __init__(self, **data):
+        # Normalize values before validation
+        if "momentum_24h" in data:
+            data["momentum_24h"] = self.normalize_momentum(data["momentum_24h"])
+        if "rsi" in data:
+            data["rsi"] = self.normalize_rsi(data["rsi"])
+        if "atr_pct" in data:
+            data["atr_pct"] = self.normalize_atr(data["atr_pct"])
+        super().__init__(**data)
 
 
 class MarketContext(BaseModel):
@@ -22,14 +47,19 @@ class MarketContext(BaseModel):
 
 
 class AccountState(BaseModel):
-    """Account state model."""
+    """Account state model with value normalization."""
     equity: float = Field(..., gt=0.0)
-    leverage: float = Field(..., ge=1.0, le=100.0)
+    leverage: float
     open_positions: List[Dict[str, Any]] = Field(default_factory=list)
     risk_level: str = Field(...)
     
     @classmethod
-    def validate_risk_level(cls, v: str) -> str:
+    def normalize_leverage(cls, v: float) -> float:
+        """Normalize leverage to [1.0, 100.0] range."""
+        return max(1.0, min(100.0, float(v)))
+    
+    @classmethod
+    def normalize_risk_level(cls, v: str) -> str:
         """Normalize risk level."""
         if not isinstance(v, str):
             return "MEDIUM"
@@ -47,6 +77,14 @@ class AccountState(BaseModel):
         elif "critical" in v.lower():
             return "CRITICAL"
         return "MEDIUM"  # Default
+    
+    def __init__(self, **data):
+        # Normalize values before validation
+        if "leverage" in data:
+            data["leverage"] = self.normalize_leverage(data["leverage"])
+        if "risk_level" in data:
+            data["risk_level"] = self.normalize_risk_level(data["risk_level"])
+        super().__init__(**data)
 
 
 class ScenarioSchema(BaseModel):

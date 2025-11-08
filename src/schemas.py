@@ -24,15 +24,21 @@ SCENARIO_SCHEMA = {
                         "properties": {
                             "momentum_24h": {
                                 "type": "number",
-                                "description": "24-hour momentum (-1.0 to 1.0)"
+                                "description": "24-hour momentum as a decimal between -1.0 and 1.0. Example: 0.05 for 5% positive momentum, -0.02 for 2% negative momentum. MUST be between -1.0 and 1.0.",
+                                "minimum": -1.0,
+                                "maximum": 1.0
                             },
                             "rsi": {
                                 "type": "number",
-                                "description": "Relative Strength Index (0-100)"
+                                "description": "Relative Strength Index between 0 and 100. Example: 65 for overbought, 35 for oversold. MUST be between 0 and 100.",
+                                "minimum": 0.0,
+                                "maximum": 100.0
                             },
                             "atr_pct": {
                                 "type": "number",
-                                "description": "Average True Range percentage (0-50)"
+                                "description": "Average True Range as percentage between 0 and 50. Example: 2.1 for 2.1% volatility. MUST be between 0 and 50.",
+                                "minimum": 0.0,
+                                "maximum": 50.0
                             }
                         },
                         "required": ["momentum_24h", "rsi", "atr_pct"]
@@ -58,7 +64,9 @@ SCENARIO_SCHEMA = {
                 },
                 "leverage": {
                     "type": "number",
-                    "description": "Current leverage ratio (1-100)"
+                    "description": "Current leverage ratio between 1.0 and 100.0. Example: 5.0 for 5x leverage. MUST be between 1.0 and 100.0.",
+                    "minimum": 1.0,
+                    "maximum": 100.0
                 },
                 "open_positions": {
                     "type": "array",
