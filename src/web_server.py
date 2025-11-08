@@ -253,6 +253,14 @@ class WebServer:
         self.start_time: Optional[datetime] = None
         self.last_stats: Dict[str, Any] = {}
         
+        # Resolve output directory to absolute path (relative to app root, not script location)
+        if Path(config.output_dir).is_absolute():
+            self.output_dir = Path(config.output_dir)
+        else:
+            # Resolve relative to app root (where main.py is)
+            app_root = Path(__file__).parent.parent.parent
+            self.output_dir = (app_root / config.output_dir).resolve()
+        
         # Create Flask app
         self.app = Flask(__name__)
         self.app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0  # Disable caching
@@ -317,8 +325,7 @@ class WebServer:
             logger.error(f"Error getting latest example: {e}")
         
         # Check if export files exist
-        output_dir = Path(self.config.output_dir)
-        can_download = (output_dir / "train.jsonl").exists()
+        can_download = (self.output_dir / "train.jsonl").exists()
         
         # Determine status
         status = "running"
@@ -367,8 +374,6 @@ class WebServer:
     
     def download_file(self, filename: str):
         """Download file endpoint."""
-        output_dir = Path(self.config.output_dir)
-        
         if filename == "all":
             # Create ZIP of all files
             import zipfile
@@ -380,9 +385,9 @@ class WebServer:
             
             with zipfile.ZipFile(zip_path.name, 'w') as zipf:
                 for file in ['train.jsonl', 'val.jsonl', 'test.jsonl']:
-                    file_path = output_dir / file
+                    file_path = self.output_dir / file
                     if file_path.exists():
-                        zipf.write(file_path, file)
+                        zipf.write(str(file_path), file)
             
             return send_file(
                 zip_path.name,
@@ -391,14 +396,14 @@ class WebServer:
                 download_name='training_data.zip'
             )
         else:
-            file_path = output_dir / filename
+            file_path = self.output_dir / filename
             if file_path.exists():
                 return send_file(
                     str(file_path),
                     mimetype='application/json',
                     as_attachment=True
                 )
-            return jsonify({'error': 'File not found'}), 404
+            return jsonify({'error': f'File not found: {file_path}'}), 404
     
     def run(self, host='0.0.0.0', port=5000, debug=False):
         """Run the web server."""
