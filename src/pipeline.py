@@ -198,9 +198,13 @@ class TrainingDataPipeline:
                 logger.error(f"Error processing reasoning: {e}")
                 self.metrics["errors"] += 1
     
-    async def generate(self, target_count: int):
+    async def generate(self, target_count: int, web_server=None):
         """Generate training examples."""
         self.running = True
+        
+        # Set target count for web server if provided
+        if web_server:
+            web_server.set_target_count(target_count)
         
         # Start reasoning result processor
         asyncio.create_task(self._process_reasoning_results())

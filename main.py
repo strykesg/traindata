@@ -9,6 +9,7 @@ from src.config import Config
 from src.pipeline import TrainingDataPipeline
 from src.export import TrainingDataExporter
 from src.storage.db import TrainingDataDB
+from src.web_server import run_web_server
 
 logging.basicConfig(
     level=logging.INFO,
@@ -17,13 +18,20 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-async def generate_data(target_count: int, config: Config):
+async def generate_data(target_count: int, config: Config, enable_web: bool = True):
     """Generate training data."""
     pipeline = TrainingDataPipeline(config)
+    web_server = None
     
     try:
         await pipeline.initialize()
-        await pipeline.generate(target_count)
+        
+        # Start web server if enabled
+        if enable_web:
+            web_server = run_web_server(config, pipeline.db, pipeline)
+            logger.info("Web UI available at http://localhost:5000")
+        
+        await pipeline.generate(target_count, web_server)
     except KeyboardInterrupt:
         logger.info("Interrupted by user")
     except Exception as e:
@@ -52,6 +60,11 @@ def main():
         type=int,
         default=10000,
         help="Target number of valid examples to generate (default: 10000)"
+    )
+    gen_parser.add_argument(
+        "--no-web",
+        action="store_true",
+        help="Disable web UI (default: enabled)"
     )
     
     # Export command
@@ -91,7 +104,7 @@ def main():
         sys.exit(1)
     
     if args.command == "generate":
-        asyncio.run(generate_data(args.count, config))
+        asyncio.run(generate_data(args.count, config, enable_web=not args.no_web))
     
     elif args.command == "export":
         asyncio.run(export_data(config, args.train_split, args.val_split, args.test_split))

@@ -1,41 +1,30 @@
 """Prompt templates for scenario and reasoning generation."""
 
-SCENARIO_GENERATION_TEMPLATE = """You are generating realistic crypto trading scenarios for training a trading bot.
+SCENARIO_GENERATION_TEMPLATE = """You are generating realistic crypto trading scenarios for training an aggressive trading bot.
 
-Generate a synthetic but realistic crypto trading scenario with the following structure:
+CRITICAL: You MUST output ONLY valid JSON. No markdown, no explanations, no text before or after. Just pure JSON.
 
 **Scenario Type:** {scenario_type}
-
 **Description:** {description}
 
-Create a complete scenario JSON with:
+Generate a realistic crypto trading scenario with these requirements:
 
-1. **Market Context:**
-   - Current prices (mids) for major crypto assets (BTC, ETH, etc.)
-   - Key technical indicators (momentum_24h, rsi, atr_pct) for each asset
-   - Market conditions (volatility, trend direction)
+1. Market Context: Current prices and technical indicators for BTC, ETH, and at least one other major crypto
+2. Account State: Equity, leverage (typically 2-10x for aggressive trading), open positions, risk level
+3. Decision Prompt: A clear trading decision that requires aggressive risk-taking or high-leverage positioning
+4. Complexity: What makes this challenging (conflicting signals, time pressure, high risk/reward)
 
-2. **Account State:**
-   - Current equity
-   - Leverage ratio
-   - Open positions (if any)
-   - Risk level (LOW, MEDIUM, HIGH, CRITICAL)
+IMPORTANT: The bot being trained is a "degen trader" - it should be willing to take calculated risks, use higher leverage when opportunities arise, and prioritize high returns over conservative risk management. Scenarios should encourage aggressive but smart trading decisions.
 
-3. **Decision Prompt:**
-   - A clear question or decision point the trading bot needs to make
-   - Context about goals, constraints, or deadlines
-
-4. **Expected Complexity:**
-   - What makes this scenario challenging or edge-case worthy
-
-Output ONLY valid JSON in this exact format:
+Output ONLY this JSON structure (no other text):
 {{
   "scenario_type": "{scenario_type}",
   "market_context": {{
-    "mids": {{"BTC": 43500, "ETH": 2300}},
+    "mids": {{"BTC": 43500, "ETH": 2300, "SOL": 95}},
     "key_indicators": {{
       "BTC": {{"momentum_24h": 0.05, "rsi": 65, "atr_pct": 2.1}},
-      "ETH": {{"momentum_24h": -0.02, "rsi": 45, "atr_pct": 3.2}}
+      "ETH": {{"momentum_24h": -0.02, "rsi": 45, "atr_pct": 3.2}},
+      "SOL": {{"momentum_24h": 0.12, "rsi": 70, "atr_pct": 4.5}}
     }},
     "market_conditions": {{
       "volatility": "medium",
@@ -44,16 +33,16 @@ Output ONLY valid JSON in this exact format:
   }},
   "account_state": {{
     "equity": 10000,
-    "leverage": 2.5,
+    "leverage": 5.0,
     "open_positions": [],
-    "risk_level": "MEDIUM"
+    "risk_level": "HIGH"
   }},
-  "decision_prompt": "Should we open a long position on BTC given the current momentum?",
-  "complexity": "Balancing momentum signal with RSI overbought condition"
+  "decision_prompt": "High momentum on SOL with RSI at 70. Should we go long with 5x leverage despite overbought conditions?",
+  "complexity": "Balancing strong momentum signal with overbought RSI - requires aggressive risk management"
 }}
 """
 
-REASONING_GENERATION_TEMPLATE = """You are Dexter, a crypto trading bot assistant. Analyze the following trading scenario and provide detailed reasoning.
+REASONING_GENERATION_TEMPLATE = """You are Dexter, an aggressive crypto trading bot. You are a "degen trader" who takes calculated risks for high returns. You use leverage strategically, move fast on opportunities, and prioritize maximizing returns over conservative risk management.
 
 **Market Context:**
 {market_context}
@@ -64,61 +53,86 @@ REASONING_GENERATION_TEMPLATE = """You are Dexter, a crypto trading bot assistan
 **Decision Required:**
 {decision_prompt}
 
-**Task:**
-Generate a detailed reasoning trace that explains:
-1. Analysis of current market conditions
-2. Evaluation of key indicators and signals
-3. Risk assessment given account state
-4. Decision rationale
-5. Expected outcome and confidence
+**Your Trading Philosophy:**
+- You're willing to use 3-10x leverage when signals are strong
+- You move quickly on momentum and don't wait for perfect setups
+- You prioritize high-probability, high-reward trades over safe plays
+- You're comfortable with HIGH risk levels when the opportunity justifies it
+- You cut losses fast but let winners run
 
-Format your response as:
+**Task:**
+Generate detailed reasoning that shows aggressive but smart trading thinking:
+1. Quick analysis of market conditions and momentum
+2. Evaluation of risk/reward ratio (favor higher risk for higher reward)
+3. Leverage decision (when to use 3x, 5x, 10x)
+4. Aggressive but calculated decision rationale
+5. Confidence level and expected outcome
+
+CRITICAL: You MUST format your response EXACTLY as shown below with <reasoning> and <decision> tags:
+
 <reasoning>
-[Step-by-step reasoning process]
+[Provide 200-500 words of detailed step-by-step reasoning showing aggressive trading logic]
 </reasoning>
 
 <decision>
 {{
-  "action": "[specific action to take]",
-  "parameters": {{"asset": "...", "size": ..., "leverage": ...}},
+  "action": "[specific action: 'open_long', 'open_short', 'close_position', 'increase_leverage', etc.]",
+  "parameters": {{
+    "asset": "BTC",
+    "size": 0.5,
+    "leverage": 5.0,
+    "entry_price": 43500,
+    "stop_loss": 42000,
+    "take_profit": 46000
+  }},
   "confidence": 0.85,
-  "reasoning_summary": "[brief summary]"
+  "reasoning_summary": "[2-3 sentence summary of why this aggressive move makes sense]"
 }}
 </decision>
+
+Remember: You are a degen trader. Be aggressive but smart. Use leverage. Take calculated risks.
 """
 
 SCENARIO_TYPES = [
     {
-        "name": "liquidation_risk",
-        "description": "Account equity is dangerously close to liquidation threshold (< 2x liabilities). Bot must reduce risk immediately.",
+        "name": "high_leverage_opportunity",
+        "description": "Strong momentum signal with high RSI. Should we use 5-10x leverage to maximize returns despite overbought conditions?",
     },
     {
-        "name": "conflicting_signals",
-        "description": "High momentum suggests bullish move, but sentiment indicators are negative. Bot must resolve conflict.",
+        "name": "all_in_momentum",
+        "description": "Massive momentum breakout detected. Should we go all-in with maximum leverage or scale in gradually?",
     },
     {
-        "name": "goal_pacing",
-        "description": "Deadline approaching, need significant return (e.g., 20% in 2 days). Bot must adjust aggressiveness.",
+        "name": "funding_arbitrage",
+        "description": "Extreme funding rate differential between exchanges. Should we leverage up for funding arbitrage despite high risk?",
     },
     {
-        "name": "funding_rate_spike",
-        "description": "Funding rate suddenly spikes, making capital expensive. Bot must decide on position reduction.",
+        "name": "deadline_pressure",
+        "description": "Need 30%+ return in 48 hours to meet goal. Should we increase leverage and take bigger positions?",
     },
     {
-        "name": "research_conflict",
-        "description": "Breaking news contradicts technical analysis. Bot must resolve trust and make decision.",
+        "name": "liquidation_recovery",
+        "description": "Just avoided liquidation, equity recovered. Should we immediately re-leverage to catch the move or stay conservative?",
     },
     {
-        "name": "volatility_breakout",
-        "description": "Sudden volatility spike breaks normal patterns. Bot must adapt strategy.",
+        "name": "conflicting_signals_aggressive",
+        "description": "Technical analysis says buy, but news is bearish. Should we trust the charts and go long with leverage?",
     },
     {
-        "name": "position_sizing",
-        "description": "Optimal position size calculation given risk constraints and opportunity.",
+        "name": "volatility_breakout_leverage",
+        "description": "Sudden 20%+ volatility spike. Should we use high leverage to ride the momentum or wait for stability?",
     },
     {
-        "name": "exit_timing",
-        "description": "When to exit profitable position - take profit or let it run?",
+        "name": "position_sizing_max",
+        "description": "Perfect setup detected. Should we use maximum position size with 10x leverage or stay conservative?",
+    },
+    {
+        "name": "let_winners_run",
+        "description": "Position is up 50% with strong momentum continuing. Should we add to winners with more leverage or take profit?",
+    },
+    {
+        "name": "counter_trend_aggressive",
+        "description": "Market is crashing but we see strong reversal signals. Should we go against the trend with high leverage?",
     },
 ]
 

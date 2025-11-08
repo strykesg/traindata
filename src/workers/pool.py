@@ -36,6 +36,7 @@ class WorkerPool:
         self.running = False
         self.scale_lock = asyncio.Lock()
         self.current_worker_count = config.min_workers
+        self._process_fn: Optional[Callable] = None
     
     async def start(self):
         """Start the worker pool."""
@@ -106,31 +107,39 @@ class WorkerPool:
         
         logger.info(f"Worker {worker_id} stopped")
     
-    async def _scale_workers(self, target_count: int):
+    async def _scale_workers(self, target_count: int, process_fn: Optional[Callable] = None):
         """Scale workers to target count."""
         async with self.scale_lock:
             target_count = max(self.config.min_workers, min(target_count, self.config.max_workers))
             
-            current_count = len(self.workers)
+            current_count = len([w for w in self.workers if not w.done()])
             
             if target_count > current_count:
+                # Scale up - only if we have a process function
+                if process_fn is None:
+                    # Can't scale up without process function, just update count
+                    self.current_worker_count = target_count
+                    self.metrics.current_workers = target_count
+                    return
+                
                 # Scale up
                 for i in range(current_count, target_count):
-                    worker_id = i + 1
-                    # Workers will be started with process_fn passed later
-                    logger.info(f"Scaling up: adding worker {worker_id}")
+                    worker_id = len(self.workers) + 1
+                    worker = asyncio.create_task(self._worker(worker_id, process_fn))
+                    self.workers.append(worker)
+                    logger.info(f"Scaling up: added worker {worker_id} (total: {len(self.workers)})")
             
             elif target_count < current_count:
                 # Scale down (let workers finish naturally)
                 to_remove = current_count - target_count
-                for i in range(to_remove):
-                    if self.workers:
-                        worker = self.workers.pop()
-                        worker.cancel()
-                        logger.info(f"Scaling down: removing worker")
+                active_workers = [w for w in self.workers if not w.done()]
+                for i in range(min(to_remove, len(active_workers))):
+                    worker = active_workers[i]
+                    worker.cancel()
+                    logger.info(f"Scaling down: removing worker (remaining: {len(active_workers) - i - 1})")
             
             self.current_worker_count = target_count
-            self.metrics.current_workers = target_count
+            self.metrics.current_workers = len([w for w in self.workers if not w.done()])
     
     async def _monitor_and_scale(self):
         """Monitor metrics and scale workers accordingly."""
@@ -143,25 +152,32 @@ class WorkerPool:
                 if time_since_limit < 60:  # Recent rate limit
                     # Scale down
                     target = max(self.config.min_workers, self.current_worker_count // 2)
-                    await self._scale_workers(target)
+                    await self._scale_workers(target, self._process_fn)
                     continue
             
             # Check queue size
             queue_size = self.task_queue.qsize()
+            active_workers = len([w for w in self.workers if not w.done()])
             
             # Scale based on queue size
-            if queue_size > 100 and self.current_worker_count < self.config.max_workers:
+            if queue_size > 100 and active_workers < self.config.max_workers:
                 # Scale up
-                target = min(self.config.max_workers, self.current_worker_count * 2)
-                await self._scale_workers(target)
-            elif queue_size < 10 and self.current_worker_count > self.config.min_workers:
+                target = min(self.config.max_workers, active_workers * 2)
+                await self._scale_workers(target, self._process_fn)
+            elif queue_size < 10 and active_workers > self.config.min_workers:
                 # Scale down
-                target = max(self.config.min_workers, self.current_worker_count // 2)
-                await self._scale_workers(target)
+                target = max(self.config.min_workers, active_workers // 2)
+                await self._scale_workers(target, self._process_fn)
     
     async def start_workers_with_fn(self, process_fn: Callable):
         """Start workers with a specific processing function."""
-        for i in range(self.current_worker_count):
-            worker = asyncio.create_task(self._worker(i + 1, process_fn))
-            self.workers.append(worker)
+        self._process_fn = process_fn
+        current_count = len([w for w in self.workers if not w.done()])
+        
+        # Only start workers if we don't have enough
+        if current_count < self.current_worker_count:
+            for i in range(current_count, self.current_worker_count):
+                worker_id = len(self.workers) + 1
+                worker = asyncio.create_task(self._worker(worker_id, process_fn))
+                self.workers.append(worker)
 

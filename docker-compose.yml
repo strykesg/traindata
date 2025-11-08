@@ -11,12 +11,14 @@ services:
     volumes:
       - ./data:/app/data
       - ./output:/app/output
+    ports:
+      - "5009:5000"
     restart: unless-stopped
     command: python main.py generate --count 10000
     environment:
       - PYTHONUNBUFFERED=1
     healthcheck:
-      test: ["CMD", "python", "-c", "import sqlite3; conn = sqlite3.connect('data/training_data.db'); conn.close()"]
+      test: ["CMD", "curl", "-f", "http://localhost:5000/api/stats"]
       interval: 30s
       timeout: 10s
       retries: 3

@@ -9,6 +9,7 @@ High-speed, multi-worker system for generating synthetic crypto trading training
 - **Flexible**: Configurable models, worker counts, generation parameters
 - **Robust**: Retry logic, error handling, progress tracking
 - **Export-ready**: Direct output to LLaMA chat template format
+- **Web UI**: Real-time progress monitoring with auto-refresh and download links
 
 ## Setup
 
@@ -28,10 +29,18 @@ cp .env.example .env
 python main.py generate --count 10000
 ```
 
+The web UI will automatically start on http://localhost:5000 showing:
+- Real-time progress (valid/total examples)
+- Latest generated example preview
+- Time remaining estimate
+- Download links for exported datasets
+
 4. **Export to training format:**
 ```bash
 python main.py export
 ```
+
+Or use the web UI download buttons after export.
 
 ## Docker Deployment
 
@@ -48,20 +57,25 @@ cp .env.example .env
 docker-compose up -d
 ```
 
-3. **View logs:**
+3. **Access web UI:**
+Open http://localhost:5000 in your browser to see real-time progress
+
+4. **View logs:**
 ```bash
 docker-compose logs -f
 ```
 
-4. **Check statistics:**
+5. **Check statistics:**
 ```bash
 docker-compose exec training-data-generator python main.py stats
 ```
 
-5. **Export data:**
+6. **Export data:**
 ```bash
 docker-compose exec training-data-generator python main.py export
 ```
+
+Or use the download buttons in the web UI after export.
 
 ## Configuration
 
@@ -90,12 +104,22 @@ Example: `MODELS=model1,model2,model3,model4`
 ### Generate Training Data
 
 ```bash
-# Generate 10,000 examples
+# Generate 10,000 examples (web UI enabled by default)
 python main.py generate --count 10000
 
 # Generate 50,000 examples
 python main.py generate --count 50000
+
+# Disable web UI
+python main.py generate --count 10000 --no-web
 ```
+
+**Web UI Features:**
+- Auto-refreshes every 5 seconds
+- Shows real-time progress (valid/total examples)
+- Displays latest generated example preview
+- Calculates time remaining based on generation rate
+- Provides download links for train/val/test sets (after export)
 
 ### Export to Training Format
 
