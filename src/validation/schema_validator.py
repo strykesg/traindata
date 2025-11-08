@@ -26,7 +26,27 @@ class AccountState(BaseModel):
     equity: float = Field(..., gt=0.0)
     leverage: float = Field(..., ge=1.0, le=100.0)
     open_positions: List[Dict[str, Any]] = Field(default_factory=list)
-    risk_level: str = Field(..., pattern=r"^(LOW|MEDIUM|HIGH|CRITICAL)$")
+    risk_level: str = Field(...)
+    
+    @classmethod
+    def validate_risk_level(cls, v: str) -> str:
+        """Normalize risk level."""
+        if not isinstance(v, str):
+            return "MEDIUM"
+        v = v.upper().strip()
+        valid_levels = ["LOW", "MEDIUM", "HIGH", "CRITICAL"]
+        if v in valid_levels:
+            return v
+        # Try to normalize
+        if "low" in v.lower():
+            return "LOW"
+        elif "medium" in v.lower():
+            return "MEDIUM"
+        elif "high" in v.lower():
+            return "HIGH"
+        elif "critical" in v.lower():
+            return "CRITICAL"
+        return "MEDIUM"  # Default
 
 
 class ScenarioSchema(BaseModel):

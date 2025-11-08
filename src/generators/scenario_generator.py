@@ -2,6 +2,7 @@
 import json
 import logging
 import random
+import asyncio
 from typing import Dict, Any, List
 import re
 
@@ -10,6 +11,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 from templates.prompts import SCENARIO_TYPES, get_scenario_prompt
 from src.workers.api_client import OpenRouterClient
+from src.schemas import SCENARIO_SCHEMA
 
 logger = logging.getLogger(__name__)
 
@@ -22,8 +24,8 @@ class ScenarioGenerator:
         self.models = models
         self.scenario_types = SCENARIO_TYPES
     
-    async def generate(self) -> Dict[str, Any]:
-        """Generate a single scenario."""
+    async def generate(self, retries: int = 3) -> Dict[str, Any]:
+        """Generate a single scenario with retry logic."""
         # Select random scenario type
         scenario_type = random.choice(self.scenario_types)
         
@@ -33,35 +35,67 @@ class ScenarioGenerator:
         # Build prompt
         prompt = get_scenario_prompt(scenario_type)
         messages = [
-            {"role": "system", "content": "You are an expert at creating realistic crypto trading scenarios. You MUST output ONLY valid JSON with no markdown formatting, no explanations, and no text outside the JSON object."},
+            {"role": "system", "content": "You are an expert at creating realistic crypto trading scenarios for training an aggressive trading bot. Generate scenarios that encourage high-leverage, calculated risk-taking decisions."},
             {"role": "user", "content": prompt},
         ]
         
-        try:
-            response = await self.client.generate(
-                model=model,
-                messages=messages,
-                temperature=0.7,  # Lower temperature for more consistent JSON
-                max_tokens=2000,
-            )
-            
-            text = await self.client.extract_text(response)
-            
-            # Try to extract JSON from response
-            scenario = self._extract_json(text)
-            
-            # Add metadata
-            scenario["_metadata"] = {
-                "generated_at": None,  # Will be set by pipeline
-                "model": model,
-                "scenario_type": scenario_type["name"],
+        # Use structured outputs to guarantee valid JSON
+        response_format = {
+            "type": "json_schema",
+            "json_schema": {
+                "name": "trading_scenario",
+                "strict": True,
+                "schema": SCENARIO_SCHEMA
             }
-            
-            return scenario
+        }
         
-        except Exception as e:
-            logger.error(f"Failed to generate scenario: {e}")
-            raise
+        last_error = None
+        for attempt in range(retries):
+            try:
+                response = await self.client.generate(
+                    model=model,
+                    messages=messages,
+                    temperature=0.7,
+                    max_tokens=2000,
+                    response_format=response_format,
+                )
+                
+                # With structured outputs, content is already valid JSON
+                text = await self.client.extract_text(response)
+                
+                if not text:
+                    raise ValueError("Empty response from API")
+                
+                # Parse JSON directly (should always be valid with structured outputs)
+                try:
+                    scenario = json.loads(text)
+                except json.JSONDecodeError as e:
+                    # Fallback to extraction if somehow not valid JSON
+                    logger.warning(f"Direct JSON parse failed, trying extraction: {e}")
+                    scenario = self._extract_json(text)
+                
+                # Add metadata
+                scenario["_metadata"] = {
+                    "generated_at": None,  # Will be set by pipeline
+                    "model": model,
+                    "scenario_type": scenario_type["name"],
+                }
+                
+                return scenario
+            
+            except Exception as e:
+                last_error = e
+                if attempt < retries - 1:
+                    wait_time = 2 ** attempt  # Exponential backoff
+                    logger.warning(f"Scenario generation attempt {attempt + 1}/{retries} failed: {e}. Retrying in {wait_time}s...")
+                    await asyncio.sleep(wait_time)
+                else:
+                    logger.error(f"Failed to generate scenario after {retries} attempts: {e}")
+                    if hasattr(e, 'args') and len(e.args) > 0:
+                        logger.error(f"Error details: {e.args[0][:500]}")
+                    raise
+        
+        raise Exception(f"Failed after {retries} attempts: {last_error}")
     
     def _extract_json(self, text: str) -> Dict[str, Any]:
         """Extract JSON from text response with multiple strategies."""
@@ -128,5 +162,7 @@ class ScenarioGenerator:
                 except json.JSONDecodeError:
                     pass
         
-        raise ValueError(f"Could not extract valid JSON from response: {text[:300]}")
+        # Log the actual response for debugging
+        logger.error(f"Could not extract valid JSON. Response length: {len(text)}, First 500 chars: {text[:500]}")
+        raise ValueError(f"Could not extract valid JSON from response (length: {len(text)}): {text[:300]}")
 

@@ -109,6 +109,7 @@ class OpenRouterClient:
         temperature: float = 0.7,
         max_tokens: int = 2000,
         retries: int = 3,
+        response_format: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         """Generate completion with retry logic."""
         if not self.session:
@@ -128,6 +129,10 @@ class OpenRouterClient:
             "temperature": temperature,
             "max_tokens": max_tokens,
         }
+        
+        # Add structured output if provided
+        if response_format:
+            payload["response_format"] = response_format
         
         last_error = None
         for attempt in range(retries):
@@ -165,15 +170,19 @@ class OpenRouterClient:
     async def extract_text(self, response: Dict[str, Any]) -> str:
         """Extract text content from API response."""
         if "choices" not in response or not response["choices"]:
-            raise ValueError("No choices in response")
+            raise ValueError(f"No choices in response: {response}")
         
         choice = response["choices"][0]
         if "message" not in choice:
-            raise ValueError("No message in choice")
+            raise ValueError(f"No message in choice: {choice}")
         
         message = choice["message"]
-        if "content" not in message:
-            raise ValueError("No content in message")
+        if "content" not in message or message["content"] is None:
+            raise ValueError(f"No content in message: {message}")
         
-        return message["content"].strip()
+        content = message["content"].strip()
+        if not content:
+            raise ValueError(f"Empty content in response: {response}")
+        
+        return content
 

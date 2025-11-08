@@ -10,6 +10,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 from templates.prompts import get_reasoning_prompt
 from src.workers.api_client import OpenRouterClient
+from src.schemas import REASONING_DECISION_SCHEMA
 
 logger = logging.getLogger(__name__)
 
@@ -21,44 +22,80 @@ class ReasoningGenerator:
         self.client = client
         self.models = models
     
-    async def generate(self, scenario: Dict[str, Any]) -> Dict[str, Any]:
-        """Generate reasoning trace for a scenario."""
+    async def generate(self, scenario: Dict[str, Any], retries: int = 3) -> Dict[str, Any]:
+        """Generate reasoning trace for a scenario with retry logic."""
         # Select model
         model = random.choice(self.models)
         
         # Build prompt
         prompt = get_reasoning_prompt(scenario)
         messages = [
-            {"role": "system", "content": "You are Dexter, an aggressive crypto trading bot. You MUST format your response with <reasoning> and <decision> XML tags. Be a degen trader - use leverage, take calculated risks, prioritize high returns."},
+            {"role": "system", "content": "You are Dexter, an aggressive crypto trading bot (degen trader). You use leverage strategically, move fast on opportunities, and prioritize maximizing returns over conservative risk management. Provide detailed reasoning and aggressive but calculated trading decisions."},
             {"role": "user", "content": prompt},
         ]
         
-        try:
-            response = await self.client.generate(
-                model=model,
-                messages=messages,
-                temperature=0.8,  # Slightly higher for more creative aggressive reasoning
-                max_tokens=2500,  # More tokens for detailed reasoning
-            )
-            
-            text = await self.client.extract_text(response)
-            
-            # Extract reasoning and decision
-            reasoning = self._extract_reasoning(text)
-            decision = self._extract_decision(text)
-            
-            return {
-                "reasoning": reasoning,
-                "decision": decision,
-                "full_response": text,
-                "_metadata": {
-                    "model": model,
-                },
+        # Use structured outputs to guarantee valid JSON structure
+        response_format = {
+            "type": "json_schema",
+            "json_schema": {
+                "name": "trading_reasoning",
+                "strict": True,
+                "schema": REASONING_DECISION_SCHEMA
             }
+        }
         
-        except Exception as e:
-            logger.error(f"Failed to generate reasoning: {e}")
-            raise
+        last_error = None
+        for attempt in range(retries):
+            try:
+                response = await self.client.generate(
+                    model=model,
+                    messages=messages,
+                    temperature=0.8,  # Higher for creative aggressive reasoning
+                    max_tokens=2500,
+                    response_format=response_format,
+                )
+                
+                # With structured outputs, content is already valid JSON
+                text = await self.client.extract_text(response)
+                
+                if not text:
+                    raise ValueError("Empty response from API")
+                
+                # Parse JSON directly (should always be valid with structured outputs)
+                try:
+                    result = json.loads(text)
+                except json.JSONDecodeError as e:
+                    logger.warning(f"Direct JSON parse failed, trying extraction: {e}")
+                    # Fallback extraction if needed
+                    reasoning = self._extract_reasoning(text)
+                    decision = self._extract_decision(text)
+                    result = {
+                        "reasoning": reasoning,
+                        "decision": decision
+                    }
+                
+                return {
+                    "reasoning": result.get("reasoning", ""),
+                    "decision": result.get("decision", {}),
+                    "full_response": text,
+                    "_metadata": {
+                        "model": model,
+                    },
+                }
+            
+            except Exception as e:
+                last_error = e
+                if attempt < retries - 1:
+                    wait_time = 2 ** attempt  # Exponential backoff
+                    logger.warning(f"Reasoning generation attempt {attempt + 1}/{retries} failed: {e}. Retrying in {wait_time}s...")
+                    await asyncio.sleep(wait_time)
+                else:
+                    logger.error(f"Failed to generate reasoning after {retries} attempts: {e}")
+                    if hasattr(e, 'args') and len(e.args) > 0:
+                        logger.error(f"Error details: {str(e.args[0])[:500]}")
+                    raise
+        
+        raise Exception(f"Failed after {retries} attempts: {last_error}")
     
     def _extract_reasoning(self, text: str) -> str:
         """Extract reasoning section from response."""

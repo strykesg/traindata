@@ -15,7 +15,7 @@ class Config:
     scenario_models: List[str]
     reasoning_models: List[str]
     min_workers: int = 4
-    max_workers: int = 32
+    max_workers: int = 16  # Reduced from 32 to prevent overload
     batch_size: int = 1000
     validation_retries: int = 3
     rate_limit_check_interval: int = 5
