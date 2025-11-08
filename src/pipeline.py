@@ -261,7 +261,14 @@ class TrainingDataPipeline:
             try:
                 exporter = TrainingDataExporter(self.db, self.config.output_dir)
                 exporter.export_to_llama_format()
-                logger.info("Auto-export complete. Files available for download.")
+                
+                # Verify files were created
+                output_path = Path(exporter.output_dir)
+                train_file = output_path / "train.jsonl"
+                if train_file.exists():
+                    logger.info(f"Auto-export complete. Files available at {output_path}")
+                else:
+                    logger.warning(f"Export completed but train.jsonl not found at {train_file}")
             except Exception as e:
                 logger.error(f"Auto-export failed: {e}", exc_info=True)
 

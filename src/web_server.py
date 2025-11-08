@@ -260,6 +260,7 @@ class WebServer:
             # Resolve relative to app root (where main.py is)
             app_root = Path(__file__).parent.parent.parent
             self.output_dir = (app_root / config.output_dir).resolve()
+        logger.info(f"Web server output directory: {self.output_dir}")
         
         # Create Flask app
         self.app = Flask(__name__)
@@ -325,7 +326,12 @@ class WebServer:
             logger.error(f"Error getting latest example: {e}")
         
         # Check if export files exist
-        can_download = (self.output_dir / "train.jsonl").exists()
+        train_file = self.output_dir / "train.jsonl"
+        can_download = train_file.exists()
+        if not can_download and self.output_dir.exists():
+            # Log available files for debugging
+            available_files = list(self.output_dir.glob("*.jsonl"))
+            logger.debug(f"Output dir exists but train.jsonl not found. Available files: {[f.name for f in available_files]}")
         
         # Determine status
         status = "running"

@@ -15,8 +15,16 @@ class TrainingDataExporter:
     
     def __init__(self, db: TrainingDataDB, output_dir: str):
         self.db = db
-        self.output_dir = Path(output_dir)
+        # Resolve to absolute path (relative to app root)
+        if Path(output_dir).is_absolute():
+            self.output_dir = Path(output_dir)
+        else:
+            # Resolve relative to app root (where main.py is)
+            # Assuming export.py is in src/, go up to app root
+            app_root = Path(__file__).parent.parent.parent
+            self.output_dir = (app_root / output_dir).resolve()
         self.output_dir.mkdir(parents=True, exist_ok=True)
+        logger.info(f"Export directory: {self.output_dir}")
     
     def export_to_llama_format(
         self,

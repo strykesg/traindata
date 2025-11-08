@@ -18,8 +18,27 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-async def generate_data(target_count: int, config: Config, enable_web: bool = True):
+async def generate_data(target_count: int, config: Config, enable_web: bool = True, check_existing: bool = True):
     """Generate training data."""
+    # Check if target is already reached
+    if check_existing:
+        db_check = TrainingDataDB(config.db_path)
+        stats = db_check.get_stats()
+        if stats["valid"] >= target_count:
+            logger.info(f"Target already reached: {stats['valid']}/{target_count} valid examples")
+            logger.info("Skipping generation. Use --force to regenerate.")
+            # Still start web server if enabled
+            if enable_web:
+                await db_check.start()
+                web_server = run_web_server(config, db_check)
+                logger.info("Web UI available at http://localhost:5000")
+                try:
+                    while True:
+                        await asyncio.sleep(60)
+                except KeyboardInterrupt:
+                    await db_check.stop()
+            return
+    
     pipeline = TrainingDataPipeline(config)
     web_server = None
     
@@ -66,6 +85,11 @@ def main():
         action="store_true",
         help="Disable web UI (default: enabled)"
     )
+    gen_parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Force generation even if target is already reached"
+    )
     
     # Export command
     export_parser = subparsers.add_parser("export", help="Export data to training format")
@@ -91,6 +115,9 @@ def main():
     # Stats command
     stats_parser = subparsers.add_parser("stats", help="Show database statistics")
     
+    # Serve command (web server only, no generation)
+    serve_parser = subparsers.add_parser("serve", help="Start web server only (no generation)")
+    
     args = parser.parse_args()
     
     if not args.command:
@@ -104,7 +131,7 @@ def main():
         sys.exit(1)
     
     if args.command == "generate":
-        asyncio.run(generate_data(args.count, config, enable_web=not args.no_web))
+        asyncio.run(generate_data(args.count, config, enable_web=not args.no_web, check_existing=not args.force))
     
     elif args.command == "export":
         asyncio.run(export_data(config, args.train_split, args.val_split, args.test_split))
@@ -119,6 +146,23 @@ def main():
         if stats['total'] > 0:
             valid_pct = (stats['valid'] / stats['total']) * 100
             print(f"  Validation rate: {valid_pct:.1f}%")
+    
+    elif args.command == "serve":
+        # Start web server only
+        async def serve_web():
+            db = TrainingDataDB(config.db_path)
+            await db.start()  # Start DB queue worker
+            web_server = run_web_server(config, db)
+            logger.info("Web server started. Access at http://localhost:5000")
+            # Keep running
+            try:
+                while True:
+                    await asyncio.sleep(60)
+            except KeyboardInterrupt:
+                logger.info("Shutting down web server")
+                await db.stop()
+        
+        asyncio.run(serve_web())
 
 
 if __name__ == "__main__":
