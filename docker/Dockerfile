@@ -22,5 +22,5 @@ RUN mkdir -p data output
 ENV PYTHONPATH=/app
 
 # Default command
-CMD ["python", "main.py", "generate", "--count", "10000"]
+CMD ["python", "main.py", "generate", "--count", "50"]
 

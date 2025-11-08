@@ -58,8 +58,8 @@ def main():
     gen_parser.add_argument(
         "--count",
         type=int,
-        default=10000,
-        help="Target number of valid examples to generate (default: 10000)"
+        default=50,
+        help="Target number of valid examples to generate (default: 50)"
     )
     gen_parser.add_argument(
         "--no-web",
