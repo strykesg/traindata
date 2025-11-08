@@ -403,12 +403,20 @@ class WebServer:
             )
         else:
             file_path = self.output_dir / filename
+            logger.info(f"Download request for {filename}, checking path: {file_path} (exists: {file_path.exists()})")
             if file_path.exists():
+                logger.info(f"Serving file: {file_path}")
                 return send_file(
                     str(file_path),
                     mimetype='application/json',
                     as_attachment=True
                 )
+            # List what files actually exist for debugging
+            if self.output_dir.exists():
+                existing = list(self.output_dir.glob("*"))
+                logger.warning(f"File not found: {file_path}. Existing files: {[f.name for f in existing]}")
+            else:
+                logger.warning(f"Output directory does not exist: {self.output_dir}")
             return jsonify({'error': f'File not found: {file_path}'}), 404
     
     def run(self, host='0.0.0.0', port=5000, debug=False):
