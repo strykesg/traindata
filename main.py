@@ -77,8 +77,8 @@ def main():
     gen_parser.add_argument(
         "--count",
         type=int,
-        default=15555,
-        help="Target number of valid examples to generate (default: 15555)"
+        default=23333,
+        help="Target number of valid examples to generate (default: 23333)"
     )
     gen_parser.add_argument(
         "--no-web",
