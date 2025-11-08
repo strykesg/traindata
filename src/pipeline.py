@@ -12,6 +12,7 @@ from src.generators.scenario_generator import ScenarioGenerator
 from src.generators.reasoning_generator import ReasoningGenerator
 from src.validation.validator import ValidationPipeline
 from src.storage.db import TrainingDataDB
+from src.export import TrainingDataExporter
 
 logger = logging.getLogger(__name__)
 
@@ -253,4 +254,14 @@ class TrainingDataPipeline:
         final_stats = self.db.get_stats()
         logger.info(f"Generation complete. Final stats: {final_stats}")
         logger.info(f"Pipeline metrics: {self.metrics}")
+        
+        # Automatically export data when generation completes
+        if final_stats["valid"] > 0:
+            logger.info("Auto-exporting data to training format...")
+            try:
+                exporter = TrainingDataExporter(self.db, self.config.output_dir)
+                exporter.export_to_llama_format()
+                logger.info("Auto-export complete. Files available for download.")
+            except Exception as e:
+                logger.error(f"Auto-export failed: {e}", exc_info=True)
 

@@ -14,7 +14,7 @@ services:
     ports:
       - "5009:5000"
     restart: unless-stopped
-    command: python main.py generate --count 50
+    command: python main.py generate --count 10
     environment:
       - PYTHONUNBUFFERED=1
     healthcheck:
