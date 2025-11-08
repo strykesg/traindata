@@ -6,7 +6,6 @@ import asyncio
 from typing import Dict, Any, List, Optional
 from datetime import datetime
 from pathlib import Path
-from collections import deque
 
 logger = logging.getLogger(__name__)
 
