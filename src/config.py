@@ -16,7 +16,8 @@ class Config:
     reasoning_models: List[str]
     min_workers: int = 4
     max_workers: int = 16  # Reduced from 32 to prevent overload
-    batch_size: int = 1000
+    batch_size: int = 100  # Database batch size (reduced for better responsiveness)
+    max_db_queue_size: int = 10000  # Maximum items in DB write queue
     validation_retries: int = 3
     rate_limit_check_interval: int = 5
     db_path: str = "data/training_data.db"
@@ -46,8 +47,9 @@ class Config:
             scenario_models=scenario_models,
             reasoning_models=reasoning_models,
             min_workers=int(os.getenv("MIN_WORKERS", "4")),
-            max_workers=int(os.getenv("MAX_WORKERS", "32")),
-            batch_size=int(os.getenv("BATCH_SIZE", "1000")),
+            max_workers=int(os.getenv("MAX_WORKERS", "16")),
+            batch_size=int(os.getenv("BATCH_SIZE", "100")),
+            max_db_queue_size=int(os.getenv("MAX_DB_QUEUE_SIZE", "10000")),
             validation_retries=int(os.getenv("VALIDATION_RETRIES", "3")),
             rate_limit_check_interval=int(os.getenv("RATE_LIMIT_CHECK_INTERVAL", "5")),
             db_path=os.getenv("DB_PATH", "data/training_data.db"),

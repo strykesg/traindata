@@ -1,4 +1,4 @@
-"""SQLite storage for training data."""
+"""SQLite storage for training data with async queue system."""
 import sqlite3
 import json
 import logging
@@ -6,19 +6,66 @@ import asyncio
 from typing import Dict, Any, List, Optional
 from datetime import datetime
 from pathlib import Path
+from collections import deque
 
 logger = logging.getLogger(__name__)
 
 
 class TrainingDataDB:
-    """SQLite database for storing training examples."""
+    """SQLite database for storing training examples with async queue."""
     
-    def __init__(self, db_path: str):
+    def __init__(self, db_path: str, batch_size: int = 100, max_queue_size: int = 10000):
         self.db_path = db_path
-        self.batch_queue: List[Dict[str, Any]] = []
-        self.batch_size = 1000
-        self.lock = asyncio.Lock()
+        self.batch_size = batch_size
+        self.max_queue_size = max_queue_size
+        
+        # Async queue for writes
+        self.write_queue: asyncio.Queue = asyncio.Queue(maxsize=max_queue_size)
+        self.batch_buffer: List[Dict[str, Any]] = []
+        self.batch_lock = asyncio.Lock()
+        
+        # Worker task
+        self.worker_task: Optional[asyncio.Task] = None
+        self.running = False
+        
+        # Statistics
+        self.stats = {
+            "queued": 0,
+            "written": 0,
+            "dropped": 0,
+            "errors": 0,
+        }
+        
         self._ensure_db()
+    
+    async def start(self):
+        """Start the background worker."""
+        self.running = True
+        self.worker_task = asyncio.create_task(self._worker())
+        logger.info("Database queue worker started")
+    
+    async def stop(self):
+        """Stop the worker and flush remaining items."""
+        self.running = False
+        
+        # Flush remaining items in buffer
+        async with self.batch_lock:
+            if self.batch_buffer:
+                await self._flush_batch()
+        
+        # Wait for queue to drain
+        while not self.write_queue.empty():
+            await asyncio.sleep(0.1)
+        
+        # Cancel worker
+        if self.worker_task:
+            self.worker_task.cancel()
+            try:
+                await self.worker_task
+            except asyncio.CancelledError:
+                pass
+        
+        logger.info("Database queue worker stopped")
     
     def _ensure_db(self):
         """Ensure database and table exist."""
@@ -61,7 +108,7 @@ class TrainingDataDB:
         validation_error: Optional[str] = None,
         scenario_id: Optional[str] = None
     ):
-        """Insert a training example (batched)."""
+        """Insert a training example (queued, non-blocking)."""
         if scenario_id is None:
             scenario_id = f"scenario_{datetime.now().timestamp()}"
         
@@ -73,26 +120,96 @@ class TrainingDataDB:
             "validation_error": validation_error,
         }
         
-        async with self.lock:
-            self.batch_queue.append(example)
-            
-            if len(self.batch_queue) >= self.batch_size:
-                await self._flush_batch()
+        # Try to put in queue (non-blocking with backpressure)
+        try:
+            self.write_queue.put_nowait(example)
+            self.stats["queued"] += 1
+        except asyncio.QueueFull:
+            # Queue is full - drop or wait based on policy
+            # For now, we'll wait briefly then drop if still full
+            try:
+                await asyncio.wait_for(self.write_queue.put(example), timeout=0.1)
+                self.stats["queued"] += 1
+            except asyncio.TimeoutError:
+                self.stats["dropped"] += 1
+                logger.warning(f"Queue full, dropping example {scenario_id}")
     
-    async def _flush_batch(self):
+    async def _worker(self):
+        """Background worker that processes the write queue."""
+        logger.info("Database write worker started")
+        
+        while self.running:
+            try:
+                # Collect batch from queue
+                batch = []
+                timeout = 1.0  # Flush after 1 second even if batch not full
+                
+                # Get first item (blocking)
+                try:
+                    item = await asyncio.wait_for(self.write_queue.get(), timeout=timeout)
+                    batch.append(item)
+                except asyncio.TimeoutError:
+                    # Timeout - flush any pending batch
+                    if batch:
+                        await self._flush_batch(batch)
+                    continue
+                
+                # Collect more items up to batch_size or timeout
+                deadline = asyncio.get_event_loop().time() + 0.1  # 100ms to collect batch
+                while len(batch) < self.batch_size:
+                    remaining_time = deadline - asyncio.get_event_loop().time()
+                    if remaining_time <= 0:
+                        break
+                    
+                    try:
+                        item = await asyncio.wait_for(
+                            self.write_queue.get(),
+                            timeout=remaining_time
+                        )
+                        batch.append(item)
+                    except asyncio.TimeoutError:
+                        break
+                
+                # Flush batch
+                if batch:
+                    await self._flush_batch(batch)
+            
+            except asyncio.CancelledError:
+                break
+            except Exception as e:
+                logger.error(f"Error in database worker: {e}", exc_info=True)
+                self.stats["errors"] += 1
+                await asyncio.sleep(1)  # Brief pause on error
+        
+        # Flush any remaining items
+        remaining = []
+        while not self.write_queue.empty():
+            try:
+                remaining.append(self.write_queue.get_nowait())
+            except asyncio.QueueEmpty:
+                break
+        
+        if remaining:
+            await self._flush_batch(remaining)
+        
+        logger.info("Database write worker stopped")
+    
+    async def _flush_batch(self, batch: List[Dict[str, Any]]):
         """Flush batch to database."""
-        if not self.batch_queue:
+        if not batch:
             return
         
-        batch = self.batch_queue.copy()
-        self.batch_queue.clear()
-        
-        # Run in thread pool to avoid blocking
-        await asyncio.get_event_loop().run_in_executor(
-            None,
-            self._write_batch,
-            batch
-        )
+        # Run in thread pool to avoid blocking event loop
+        try:
+            await asyncio.get_event_loop().run_in_executor(
+                None,
+                self._write_batch,
+                batch
+            )
+            self.stats["written"] += len(batch)
+        except Exception as e:
+            logger.error(f"Error flushing batch: {e}")
+            self.stats["errors"] += len(batch)
     
     def _write_batch(self, batch: List[Dict[str, Any]]):
         """Write batch to database (synchronous)."""
@@ -121,9 +238,29 @@ class TrainingDataDB:
             conn.close()
     
     async def flush(self):
-        """Flush any pending batches."""
-        async with self.lock:
-            await self._flush_batch()
+        """Flush any pending batches (wait for queue to drain)."""
+        # Wait for queue to be processed
+        max_wait = 30  # Maximum wait time in seconds
+        start_time = asyncio.get_event_loop().time()
+        
+        while not self.write_queue.empty():
+            if asyncio.get_event_loop().time() - start_time > max_wait:
+                logger.warning(f"Flush timeout after {max_wait}s, {self.write_queue.qsize()} items still queued")
+                break
+            await asyncio.sleep(0.1)
+        
+        logger.info(f"Database flush complete. Stats: {self.stats}")
+    
+    def get_queue_stats(self) -> Dict[str, Any]:
+        """Get queue statistics."""
+        return {
+            "queue_size": self.write_queue.qsize(),
+            "max_queue_size": self.max_queue_size,
+            "queued_total": self.stats["queued"],
+            "written_total": self.stats["written"],
+            "dropped_total": self.stats["dropped"],
+            "errors_total": self.stats["errors"],
+        }
     
     def get_valid_examples(self, limit: Optional[int] = None) -> List[Dict[str, Any]]:
         """Get validated examples."""

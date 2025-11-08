@@ -27,7 +27,11 @@ class TrainingDataPipeline:
         self.scenario_generator: Optional[ScenarioGenerator] = None
         self.reasoning_generator: Optional[ReasoningGenerator] = None
         self.validator = ValidationPipeline()
-        self.db = TrainingDataDB(config.db_path)
+        self.db = TrainingDataDB(
+            config.db_path,
+            batch_size=config.batch_size,
+            max_queue_size=config.max_db_queue_size
+        )
         self.scenario_queue: asyncio.Queue = asyncio.Queue()
         self.running = False
         self.metrics = {
@@ -43,6 +47,9 @@ class TrainingDataPipeline:
         """Initialize pipeline components."""
         self.client = OpenRouterClient(self.config.openrouter_api_key)
         await self.client.__aenter__()
+        
+        # Start database queue worker
+        await self.db.start()
         
         # Create scenario generator
         self.scenario_generator = ScenarioGenerator(
@@ -80,8 +87,10 @@ class TrainingDataPipeline:
         if self.reasoning_pool:
             await self.reasoning_pool.stop()
         
-        # Flush database
-        await self.db.flush()
+        # Stop database worker and flush
+        if self.db:
+            await self.db.stop()
+            await self.db.flush()
         
         if self.client:
             await self.client.__aexit__(None, None, None)
