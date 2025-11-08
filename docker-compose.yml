@@ -1,0 +1,24 @@
+version: '3.8'
+
+services:
+  training-data-generator:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    container_name: training-data-generator
+    env_file:
+      - .env
+    volumes:
+      - ./data:/app/data
+      - ./output:/app/output
+    restart: unless-stopped
+    command: python main.py generate --count 10000
+    environment:
+      - PYTHONUNBUFFERED=1
+    healthcheck:
+      test: ["CMD", "python", "-c", "import sqlite3; conn = sqlite3.connect('data/training_data.db'); conn.close()"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
