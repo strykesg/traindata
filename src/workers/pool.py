@@ -37,6 +37,7 @@ class WorkerPool:
         self.scale_lock = asyncio.Lock()
         self.current_worker_count = config.min_workers
         self._process_fn: Optional[Callable] = None
+        logger.info(f"WorkerPool initialized: min_workers={config.min_workers}, max_workers={config.max_workers}")
     
     async def start(self):
         """Start the worker pool."""
@@ -110,12 +111,23 @@ class WorkerPool:
     async def _scale_workers(self, target_count: int, process_fn: Optional[Callable] = None):
         """Scale workers to target count."""
         async with self.scale_lock:
-            # Enforce max_workers limit strictly
+            # Enforce max_workers limit strictly - never exceed it
+            original_target = target_count
             target_count = max(self.config.min_workers, min(target_count, self.config.max_workers))
+            
+            if original_target > self.config.max_workers:
+                logger.warning(f"Target count {original_target} exceeds max_workers {self.config.max_workers}, clamping to {target_count}")
             
             # Get active workers only
             active_workers = [w for w in self.workers if not w.done()]
             current_count = len(active_workers)
+            
+            # Double-check we're not already at max
+            if current_count >= self.config.max_workers:
+                logger.debug(f"Already at max_workers ({self.config.max_workers}), skipping scale")
+                self.current_worker_count = current_count
+                self.metrics.current_workers = current_count
+                return
             
             if target_count > current_count:
                 # Scale up - only if we have a process function
@@ -135,7 +147,8 @@ class WorkerPool:
                     worker_id = len(self.workers) + 1
                     worker = asyncio.create_task(self._worker(worker_id, process_fn))
                     self.workers.append(worker)
-                    logger.info(f"Scaling up: added worker {worker_id} (active: {current_count + i + 1}/{self.config.max_workers})")
+                    new_count = current_count + i + 1
+                    logger.info(f"Scaling up: added worker {worker_id} (active: {new_count}/{self.config.max_workers})")
             
             elif target_count < current_count:
                 # Scale down (let workers finish naturally)

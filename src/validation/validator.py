@@ -54,21 +54,23 @@ class ValidationPipeline:
         if not valid:
             return False, f"Stage 1 (Schema): {error}"
         
-        # Stage 2: Format validation
+        # Stage 2: Format validation (no XML tags needed with structured outputs)
         reasoning_text = reasoning_data.get("reasoning", "")
-        valid, error = self.format_validator.validate_reasoning_tags(
-            reasoning_text + "\n" + str(reasoning_data.get("decision", {}))
-        )
-        if not valid:
-            return False, f"Stage 2 (Format): {error}"
-        
         decision = reasoning_data.get("decision", {})
+        
+        # Check that required fields exist (structured outputs should guarantee this)
+        if not reasoning_text or len(reasoning_text.strip()) < 50:
+            return False, "Stage 2 (Format): Reasoning text too short or missing"
+        
+        if not decision or not isinstance(decision, dict):
+            return False, "Stage 2 (Format): Decision object missing or invalid"
+        
+        if "action" not in decision:
+            return False, "Stage 2 (Format): Decision missing 'action' field"
+        
         confidence = decision.get("confidence")
-        if confidence is not None:
-            valid, error = self.format_validator.validate_outcome_label(
-                "SUCCESS" if confidence > 0.5 else "FAILURE"
-            )
-            # This is just a check, not critical
+        if confidence is None:
+            return False, "Stage 2 (Format): Decision missing 'confidence' field"
         
         # Stage 3: Content validation
         valid, error = self.content_validator.validate_reasoning_coherence(reasoning_text)
