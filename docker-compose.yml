@@ -15,7 +15,7 @@ services:
       - "5009:5000"
     restart: unless-stopped
     # Automatically checks if target is reached and skips generation if so
-    command: python main.py generate --count 10
+    command: python main.py generate --count 15555
     environment:
       - PYTHONUNBUFFERED=1
     healthcheck:

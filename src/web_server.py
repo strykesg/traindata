@@ -328,10 +328,13 @@ class WebServer:
         # Check if export files exist
         train_file = self.output_dir / "train.jsonl"
         can_download = train_file.exists()
+        logger.debug(f"Checking download availability: {train_file} exists={can_download}, output_dir={self.output_dir}")
         if not can_download and self.output_dir.exists():
             # Log available files for debugging
             available_files = list(self.output_dir.glob("*.jsonl"))
-            logger.debug(f"Output dir exists but train.jsonl not found. Available files: {[f.name for f in available_files]}")
+            logger.info(f"Output dir exists but train.jsonl not found. Available files: {[f.name for f in available_files]}")
+        elif not self.output_dir.exists():
+            logger.warning(f"Output directory does not exist: {self.output_dir}")
         
         # Determine status
         status = "running"
