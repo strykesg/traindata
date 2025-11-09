@@ -16,9 +16,9 @@ from dotenv import load_dotenv
 # Load environment variables from .env file
 load_dotenv()
 
-# Configuration
-MODEL_NAME = "Qwen/Qwen3-1.7B"
-DATA_DIR = Path(os.getenv("DATA_DIR", "data"))  # Default to data directory, override with env var
+# Hardcoded Configuration
+MODEL_NAME = "Qwen/Qwen3-1.7B"  # Fixed model
+DATA_DIR = Path("data")  # Fixed data directory
 OUTPUT_DIR = Path("output_model")
 MAX_SEQ_LENGTH = 2048
 BATCH_SIZE = 4  # Adjust based on GPU memory
@@ -30,11 +30,11 @@ LOGGING_STEPS = 10
 SAVE_STEPS = 500
 EVAL_STEPS = 500
 
-# WandB and HuggingFace setup
-WANDB_PROJECT = os.getenv("WANDB_PROJECT", "qwen3-1.7b-finetune")
+# WandB and HuggingFace setup (only these are from environment)
+WANDB_PROJECT = "qwen3-1.7b-finetune"  # Hardcoded
 HF_TOKEN = os.getenv("HF_TOKEN", "")
 WANDB_API_KEY = os.getenv("WANDB_API_KEY", "")
-HF_USERNAME = os.getenv("HF_USERNAME", "")
+# Model upload disabled by default (set HF_MODEL_ID in .env if you want to upload)
 HF_MODEL_ID = os.getenv("HF_MODEL_ID", "")
 
 def load_training_data(data_dir: Path):
@@ -197,20 +197,13 @@ def main():
     model.save_pretrained(str(OUTPUT_DIR))
     tokenizer.save_pretrained(str(OUTPUT_DIR))
     
-    # Save to HuggingFace Hub (optional)
-    if HF_TOKEN:
-        if HF_MODEL_ID:
-            hub_model_id = HF_MODEL_ID
-        elif HF_USERNAME:
-            hub_model_id = f"{HF_USERNAME}/qwen3-1.7b-trading-bot"
-        else:
-            print("Warning: HF_MODEL_ID or HF_USERNAME not set. Skipping HuggingFace Hub upload.")
-            hub_model_id = None
-        
-        if hub_model_id:
-            print(f"Pushing to HuggingFace Hub: {hub_model_id}")
-            model.push_to_hub(hub_model_id, token=HF_TOKEN)
-            tokenizer.push_to_hub(hub_model_id, token=HF_TOKEN)
+    # Save to HuggingFace Hub (only if HF_MODEL_ID is explicitly set)
+    if HF_TOKEN and HF_MODEL_ID:
+        print(f"Pushing to HuggingFace Hub: {HF_MODEL_ID}")
+        model.push_to_hub(HF_MODEL_ID, token=HF_TOKEN)
+        tokenizer.push_to_hub(HF_MODEL_ID, token=HF_TOKEN)
+    elif HF_TOKEN:
+        print("Note: Model saved locally. Set HF_MODEL_ID in .env to upload to HuggingFace Hub.")
     
     # Finish WandB run
     wandb.finish()

@@ -7,75 +7,41 @@ echo "=========================================="
 echo "Setting up Qwen3-1.7B Fine-tuning Environment"
 echo "=========================================="
 
-# Function to prompt for input with default value
-prompt_with_default() {
-    local prompt_text=$1
-    local default_value=$2
-    local var_name=$3
-    local is_secret=${4:-false}
-    
-    if [ "$is_secret" = true ]; then
-        read -sp "$prompt_text [$default_value]: " input
-        echo ""
-    else
-        read -p "$prompt_text [$default_value]: " input
-    fi
-    
-    if [ -z "$input" ]; then
-        input=$default_value
-    fi
-    
-    eval "$var_name='$input'"
-}
-
 # Collect environment variables
 echo ""
 echo "Please provide the following information:"
-echo "(Press Enter to use default values in brackets)"
 echo ""
 
 # Required: HuggingFace Token
-prompt_with_default "HuggingFace API Token (required)" "" HF_TOKEN true
+read -sp "HuggingFace API Token (required): " HF_TOKEN
+echo ""
 if [ -z "$HF_TOKEN" ]; then
     echo "ERROR: HuggingFace token is required!"
     exit 1
 fi
 
 # Optional: WandB API Key
-prompt_with_default "WandB API Key (optional, press Enter to skip)" "" WANDB_API_KEY true
-
-# Optional: HuggingFace Username
-prompt_with_default "HuggingFace Username (for model upload)" "" HF_USERNAME false
-
-# Optional: WandB Project
-prompt_with_default "WandB Project Name" "qwen3-1.7b-finetune" WANDB_PROJECT false
-
-# Optional: Data Directory
-prompt_with_default "Data Directory (train.jsonl location)" "data" DATA_DIR false
-
-# Optional: HuggingFace Model ID
-if [ -n "$HF_USERNAME" ]; then
-    default_model_id="${HF_USERNAME}/qwen3-1.7b-trading-bot"
-else
-    default_model_id=""
-fi
-prompt_with_default "HuggingFace Model ID (for upload)" "$default_model_id" HF_MODEL_ID false
-
-# Create .env file
+read -sp "WandB API Key (optional, press Enter to skip): " WANDB_API_KEY
 echo ""
-echo "Creating .env file..."
+
+# Create .env file with hardcoded defaults
+echo ""
+echo "Creating .env file with hardcoded configuration..."
 cat > .env << EOF
 # HuggingFace Configuration
 HF_TOKEN=$HF_TOKEN
-HF_USERNAME=$HF_USERNAME
-HF_MODEL_ID=$HF_MODEL_ID
+HF_USERNAME=
+HF_MODEL_ID=
 
 # WandB Configuration
 WANDB_API_KEY=$WANDB_API_KEY
-WANDB_PROJECT=$WANDB_PROJECT
+WANDB_PROJECT=qwen3-1.7b-finetune
 
 # Data Configuration
-DATA_DIR=$DATA_DIR
+DATA_DIR=data
+
+# Model Configuration (hardcoded)
+MODEL_NAME=Qwen/Qwen3-1.7B
 EOF
 
 echo ".env file created successfully!"

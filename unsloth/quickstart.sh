@@ -27,32 +27,22 @@ if [ -z "$WANDB_API_KEY" ]; then
     echo "WARNING: WANDB_API_KEY not set. WandB logging will be disabled."
 fi
 
-# Set defaults
-export DATA_DIR=${DATA_DIR:-"data"}
-export WANDB_PROJECT=${WANDB_PROJECT:-"qwen3-1.7b-finetune"}
-
-echo "Configuration:"
+echo "Configuration (hardcoded):"
 echo "  Model: Qwen/Qwen3-1.7B"
-echo "  Data directory: $DATA_DIR"
-echo "  WandB project: $WANDB_PROJECT"
-if [ -n "$HF_USERNAME" ]; then
-    echo "  HF Username: $HF_USERNAME"
-fi
-if [ -n "$HF_MODEL_ID" ]; then
-    echo "  HF Model ID: $HF_MODEL_ID"
-fi
+echo "  Data directory: data"
+echo "  WandB project: qwen3-1.7b-finetune"
 echo ""
 
 # Check if data directory exists
-if [ ! -d "$DATA_DIR" ]; then
-    echo "ERROR: Data directory '$DATA_DIR' not found"
-    echo "Please ensure training data exists in $DATA_DIR/"
+if [ ! -d "data" ]; then
+    echo "ERROR: Data directory 'data' not found"
+    echo "Please ensure training data exists in data/"
     exit 1
 fi
 
 # Check if train.jsonl exists
-if [ ! -f "$DATA_DIR/train.jsonl" ]; then
-    echo "ERROR: $DATA_DIR/train.jsonl not found"
+if [ ! -f "data/train.jsonl" ]; then
+    echo "ERROR: data/train.jsonl not found"
     exit 1
 fi
 
