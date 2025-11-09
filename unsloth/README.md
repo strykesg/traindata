@@ -24,8 +24,19 @@ export DATA_DIR="data"  # Default is "data" directory, change if needed
 
 ### 2. Install Dependencies
 
+**Important:** PyTorch 2.5.1+ is required for `torch.int1` support (needed by torchao).
+
 ```bash
+# Install PyTorch 2.5.1 with CUDA 12.1 first
+pip install torch==2.5.1 torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
+
+# Then install other dependencies
 pip install -r requirements.txt
+```
+
+**For automated setup on vast.ai:**
+```bash
+bash setup_vast.sh  # Interactive setup with environment variables
 ```
 
 ### 3. Prepare Training Data
@@ -138,6 +149,37 @@ response = tokenizer.decode(outputs[0], skip_special_tokens=True)
 ```
 
 ## Troubleshooting
+
+### AttributeError: module 'torch' has no attribute 'int1'
+
+This error occurs when PyTorch version is too old for the `torchao` dependency. 
+
+**Quick Fix:**
+```bash
+# Activate your venv if not already active
+source venv/bin/activate
+
+# Run the fix script (CUDA 12.1)
+bash fix_torch.sh
+
+# Or for CUDA 12.4
+bash fix_torch_cu124.sh
+```
+
+**Manual Fix:**
+```bash
+# Uninstall old PyTorch
+pip uninstall -y torch torchvision torchaudio
+
+# Install PyTorch 2.5.1 with CUDA 12.1
+pip install torch==2.5.1 torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
+
+# Or for CUDA 12.4
+pip install torch==2.5.1 torchvision torchaudio --index-url https://download.pytorch.org/whl/cu124
+
+# Reinstall unsloth
+pip install --upgrade --force-reinstall unsloth[colab-new] @ git+https://github.com/unslothai/unsloth.git
+```
 
 ### Out of Memory
 - Reduce `BATCH_SIZE`
