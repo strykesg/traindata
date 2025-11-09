@@ -48,12 +48,14 @@ echo "Starting llama-server..."
 echo "=========================================="
 
 # Execute llama-server with all arguments from docker-compose
-# docker-compose command: > creates arguments that need to be passed to llama-server
+# docker-compose command: > creates a multi-line string that needs to be executed
+# We need to properly handle the arguments passed from docker-compose
 if [ $# -eq 0 ]; then
     # No arguments, use default llama-server
     exec llama-server
 else
-    # Pass all arguments to llama-server
+    # docker-compose passes arguments, execute llama-server with them
+    # The arguments are already properly separated by docker-compose
     exec llama-server "$@"
 fi
 
