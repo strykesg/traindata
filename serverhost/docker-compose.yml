@@ -84,10 +84,6 @@ services:
     # Ensure models directory exists on host
     init: true
 
-volumes:
-  # Note: models directory uses bind mount (./models) for direct host access
-  # This allows easy model management from the host filesystem
-
 networks:
   default:
     name: llama-network
