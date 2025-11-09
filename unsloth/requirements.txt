@@ -1,7 +1,8 @@
 # Unsloth and core dependencies
+# Note: PyTorch 2.5.0+ required for unsloth compatibility (torch.int1 support)
 unsloth[colab-new] @ git+https://github.com/unslothai/unsloth.git
 transformers>=4.51.0
-torch>=2.0.0
+torch>=2.5.0  # Required for torch.int1 support
 accelerate>=0.21.0
 bitsandbytes>=0.41.0
 peft>=0.6.0

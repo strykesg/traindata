@@ -139,6 +139,18 @@ response = tokenizer.decode(outputs[0], skip_special_tokens=True)
 
 ## Troubleshooting
 
+### PyTorch Compatibility Error (`torch.int1` not found)
+If you see `AttributeError: module 'torch' has no attribute 'int1'`:
+```bash
+# Run the fix script
+bash fix_torch.sh
+
+# Or manually upgrade PyTorch
+pip install --upgrade torch>=2.5.0 torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
+```
+
+**Note:** Unsloth requires PyTorch 2.5.0+ for `torch.int1` support. The setup script installs this automatically, but if you encounter this error, use the fix script above.
+
 ### Out of Memory
 - Reduce `BATCH_SIZE`
 - Increase `GRADIENT_ACCUMULATION_STEPS`
