@@ -173,8 +173,17 @@ def upload_model():
     filename = secure_filename(file.filename)
     filepath = MODELS_DIR / filename
     
-    print(f"Secure filename: {filename}")
-    print(f"Target path: {filepath}")
+    # Resolve any symlinks to get the actual path
+    try:
+        resolved_path = filepath.resolve()
+        print(f"Secure filename: {filename}")
+        print(f"Target path: {filepath}")
+        print(f"Resolved path: {resolved_path}")
+    except Exception as e:
+        print(f"Could not resolve path: {e}")
+        resolved_path = filepath
+    
+    sys.stdout.flush()
     
     # Check if file already exists
     if filepath.exists():
@@ -208,22 +217,51 @@ def upload_model():
             # This should complete before we continue
             print(f"Calling file.save()...")
             sys.stdout.flush()
+            
+            # Save the file
             file.save(str(filepath))
             print(f"✓ file.save() returned")
             sys.stdout.flush()
             
-            # Small delay to ensure filesystem has updated
+            # Wait for file to be written (for large files, this may take time)
             import time
-            time.sleep(0.5)
+            max_wait = 300  # 5 minutes max wait
+            wait_interval = 1  # Check every second
+            waited = 0
             
-            # Verify immediately
+            while waited < max_wait:
+                if filepath.exists():
+                    current_size = filepath.stat().st_size
+                    if current_size >= file_size:
+                        print(f"✓ File fully written: {current_size} bytes")
+                        sys.stdout.flush()
+                        break
+                    else:
+                        print(f"⏳ File writing in progress: {current_size}/{file_size} bytes ({current_size*100/file_size:.1f}%)")
+                        sys.stdout.flush()
+                else:
+                    print(f"⏳ Waiting for file to appear... ({waited}s)")
+                    sys.stdout.flush()
+                
+                time.sleep(wait_interval)
+                waited += wait_interval
+            
+            # Final verification
             if not filepath.exists():
-                print(f"✗ File does not exist immediately after save!")
+                print(f"✗ File does not exist after save and wait!")
                 sys.stdout.flush()
                 flash(f'Upload failed: File was not saved', 'error')
                 return redirect(url_for('index'))
             
-            print(f"✓ File exists after save")
+            final_size = filepath.stat().st_size
+            if final_size < file_size:
+                print(f"✗ File incomplete after wait: {final_size}/{file_size} bytes")
+                sys.stdout.flush()
+                filepath.unlink()
+                flash(f'Upload failed: File incomplete ({final_size} of {file_size} bytes)', 'error')
+                return redirect(url_for('index'))
+            
+            print(f"✓ File exists and is complete after save")
             sys.stdout.flush()
             
             # Ensure file is written to disk
@@ -264,7 +302,6 @@ def upload_model():
         print(f"  Path: {filepath}")
         print(f"  Size: {saved_size} bytes ({saved_size / (1024**3):.2f} GB)")
         print(f"  Expected: {file_size} bytes")
-        print(f"  Written: {written} bytes")
         
         if saved_size != file_size:
             print(f"⚠️  Size mismatch! Expected {file_size}, got {saved_size}")
