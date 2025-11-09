@@ -7,6 +7,8 @@ services:
     container_name: llama-cpp-server
     volumes:
       - ./models:/models:rw  # Models directory (rw so it can see newly uploaded files)
+    environment:
+      - LLAMA_MODEL_PATH=/models/qwen3-1.7b-trading-Q4_K_M.gguf
     command:
       - --host
       - 0.0.0.0
