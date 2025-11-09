@@ -54,7 +54,21 @@ echo ""
 echo "Starting llama-server..."
 echo "=========================================="
 
-# Execute llama-server with all arguments
-# Use exec to replace shell process
-exec llama-server "$@"
+# Filter out any problematic arguments (like standalone "--")
+ARGS=()
+for arg in "$@"; do
+    # Skip empty arguments or standalone "--"
+    if [ -n "$arg" ] && [ "$arg" != "--" ]; then
+        ARGS+=("$arg")
+    fi
+done
+
+# Execute llama-server with filtered arguments
+if [ ${#ARGS[@]} -eq 0 ]; then
+    echo "No arguments provided, starting with defaults"
+    exec llama-server
+else
+    echo "Starting llama-server with ${#ARGS[@]} arguments"
+    exec llama-server "${ARGS[@]}"
+fi
 
