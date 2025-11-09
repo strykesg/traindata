@@ -61,9 +61,9 @@ source venv/bin/activate
 echo "Upgrading pip..."
 pip install --upgrade pip
 
-# Install PyTorch with CUDA support (adjust CUDA version as needed)
-echo "Installing PyTorch..."
-pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
+# Install PyTorch with CUDA support (for A100, use CUDA 12.1 or 12.4)
+echo "Installing PyTorch 2.5.1 with CUDA 12.1 support..."
+pip install torch==2.5.1 torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
 
 # Install requirements
 echo "Installing requirements..."

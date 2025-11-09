@@ -1,12 +1,13 @@
 # Unsloth and core dependencies
-unsloth[colab-new] @ git+https://github.com/unslothai/unsloth.git
+# Note: torch must be installed first with CUDA support
+# Run: pip install torch==2.5.1 torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
 transformers>=4.51.0
-torch>=2.0.0
 accelerate>=0.21.0
 bitsandbytes>=0.41.0
 peft>=0.6.0
 trl>=0.7.0
 datasets>=2.14.0
+unsloth[colab-new] @ git+https://github.com/unslothai/unsloth.git
 
 # WandB for logging
 wandb>=0.15.0
