@@ -33,29 +33,38 @@ echo "Patching: $QUANT_PRIMITIVES"
 cp "$QUANT_PRIMITIVES" "$QUANT_PRIMITIVES.backup"
 echo "Backup created: $QUANT_PRIMITIVES.backup"
 
-# Patch the file - comment out or wrap the problematic line
-python3 << 'PYTHON_SCRIPT'
+# Patch the file - comment out the problematic line
+python3 << PYTHON_SCRIPT
 import re
+import sys
 
 file_path = "$QUANT_PRIMITIVES"
 with open(file_path, 'r') as f:
     content = f.read()
 
 # Find and comment out the torch.int1 line
-if 'torch.int1:' in content:
-    # Replace the problematic line
-    content = re.sub(
-        r'(\s+)torch\.int1:\s*\(-\(2\*\*0\),\s*2\*\*0\s*-\s*1\),',
-        r'\1# torch.int1: (-(2**0), 2**0 - 1),  # Patched: not available in all PyTorch builds',
-        content
-    )
+if 'torch.int1:' in content and '# torch.int1:' not in content:
+    # Replace the problematic line - match various whitespace patterns
+    lines = content.split('\n')
+    patched = False
+    for i, line in enumerate(lines):
+        if 'torch.int1:' in line and '#' not in line.split('torch.int1:')[0]:
+            # Comment out this line
+            indent = len(line) - len(line.lstrip())
+            lines[i] = ' ' * indent + '# torch.int1: (-(2**0), 2**0 - 1),  # Patched: not available in all PyTorch builds'
+            patched = True
+            break
     
-    with open(file_path, 'w') as f:
-        f.write(content)
-    print("Successfully patched quant_primitives.py")
-    print("The torch.int1 line has been commented out")
+    if patched:
+        content = '\n'.join(lines)
+        with open(file_path, 'w') as f:
+            f.write(content)
+        print("Successfully patched quant_primitives.py")
+        print("The torch.int1 line has been commented out")
+    else:
+        print("Warning: Could not find uncommented torch.int1 line (may already be patched)")
 else:
-    print("Warning: torch.int1 line not found in file (may already be patched)")
+    print("Warning: torch.int1 line not found or already patched")
 PYTHON_SCRIPT
 
 echo ""
