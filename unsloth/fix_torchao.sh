@@ -69,23 +69,26 @@ file_path = "$QUANT_PRIMITIVES"
 with open(file_path, 'r') as f:
     content = f.read()
 
-# Find and comment out all problematic torch.int* lines
+# Find and comment out ALL problematic torch.int* lines (int1, int2, int3, int4)
 lines = content.split('\n')
 patched_types = []
 for i, line in enumerate(lines):
-    # Check for torch.int1, int2, int4, etc. that might not be available
-    for int_type in ['int1', 'int2', 'int4']:
-        if f'torch.{int_type}:' in line and '#' not in line.split(f'torch.{int_type}:')[0]:
-            # Comment out this line
-            indent = len(line) - len(line.lstrip())
-            # Extract the value part if present
-            if ':' in line:
-                value_part = line.split(':', 1)[1].strip()
-                lines[i] = f'{" " * indent}# torch.{int_type}: {value_part}  # Patched: not available in all PyTorch builds'
-            else:
-                lines[i] = f'{" " * indent}# torch.{int_type}: ...  # Patched: not available in all PyTorch builds'
-            patched_types.append(int_type)
-            break
+    # Check for any torch.int* lines that aren't already commented
+    if 'torch.int' in line and ':' in line and not line.strip().startswith('#'):
+        # Check if it's int1, int2, int3, or int4
+        for int_type in ['int1', 'int2', 'int3', 'int4']:
+            if f'torch.{int_type}:' in line:
+                # Comment out this line
+                indent = len(line) - len(line.lstrip())
+                # Extract the value part if present
+                if ':' in line:
+                    value_part = line.split(':', 1)[1].strip()
+                    lines[i] = f'{" " * indent}# torch.{int_type}: {value_part}  # Patched: not available in all PyTorch builds'
+                else:
+                    lines[i] = f'{" " * indent}# torch.{int_type}: ...  # Patched: not available in all PyTorch builds'
+                if int_type not in patched_types:
+                    patched_types.append(int_type)
+                break
 
 if patched_types:
     content = '\n'.join(lines)

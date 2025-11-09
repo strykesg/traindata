@@ -28,9 +28,9 @@ def create_int_dtype(name):
             return isinstance(other, IntDType) and other.dtype_name == self.dtype_name or str(other) == f"torch.{self.dtype_name}"
     return IntDType(name)
 
-# Patch all missing int types that torchao might use
+# Patch all missing int types that torchao might use (int1, int2, int3, int4)
 missing_types = []
-for int_type in ['int1', 'int2', 'int4']:
+for int_type in ['int1', 'int2', 'int3', 'int4']:
     if not hasattr(torch, int_type):
         setattr(torch, int_type, create_int_dtype(int_type))
         sys.modules['torch'].__dict__[int_type] = getattr(torch, int_type)
@@ -40,6 +40,16 @@ if missing_types:
     print(f"Warning: torch types {missing_types} not available in this PyTorch build")
     print("Applying workaround before unsloth/torchao imports...")
     print(f"Workaround applied: {', '.join(f'torch.{t}' for t in missing_types)} placeholders created")
+    
+    # Also try to patch torchao file directly as backup
+    try:
+        import subprocess
+        result = subprocess.run([sys.executable, 'patch_torchao_simple.py'], 
+                              capture_output=True, text=True, timeout=10)
+        if result.returncode == 0:
+            print("Also patched torchao file directly as backup")
+    except:
+        pass  # Ignore if patch script fails
 
 # Now safe to import other modules
 import os
