@@ -19,11 +19,11 @@ services:
       - --alias
       - bradllm
       - --ctx-size
-      - "42328"
+      - "32768"
       - --threads
-      - "7"
+      - "6"
       - --threads-batch
-      - "5"
+      - "6"
       - --n-gpu-layers
       - "0"
       - --parallel
@@ -32,20 +32,29 @@ services:
       - --no-mmap
       - --mlock
       - --jinja
+      - --batch-size
+      - "512"
+      - --ubatch-size
+      - "512"
     restart: unless-stopped
+    shm_size: '2gb'
+    ulimits:
+      memlock: -1
+      stack: 67108864
     deploy:
       resources:
         limits:
           cpus: '6'
           memory: 12G
         reservations:
-          cpus: '4'
-          memory: 5G
+          cpus: '6'
+          memory: 8G
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
       interval: 30s
       timeout: 10s
       retries: 3
+      start_period: 40s
 
   # Simple upload UI for managing models
   upload-ui:
