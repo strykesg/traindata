@@ -15,7 +15,7 @@ services:
       - --port
       - "8080"
       - -m
-      - /models/current.gguf
+      - /models/qwen3-1.7b-trading-Q4_K_M.gguf
       - --alias
       - bradllm
       - --ctx-size
