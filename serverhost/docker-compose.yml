@@ -6,7 +6,7 @@ services:
     image: ghcr.io/ggerganov/llama.cpp:server
     container_name: llama-cpp-server
     volumes:
-      - ./models:/models:ro  # Models directory
+      - ./models:/models:rw  # Models directory (rw so it can see newly uploaded files)
     command:
       - --host
       - 0.0.0.0

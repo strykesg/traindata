@@ -29,15 +29,42 @@ def allowed_file(filename):
 def get_models():
     """Get list of available models"""
     models = []
-    for model_file in MODELS_DIR.glob('*.gguf'):
-        stat = model_file.stat()
-        models.append({
-            'name': model_file.name,
-            'size': f"{stat.st_size / (1024**3):.2f} GB",
-            'size_bytes': stat.st_size,
-            'is_active': model_file.name == 'current.gguf' or 
-                        (MODELS_DIR / 'current.gguf').resolve() == model_file.resolve()
-        })
+    
+    # Ensure directory exists
+    MODELS_DIR.mkdir(parents=True, exist_ok=True)
+    
+    # Debug: list all files in directory
+    try:
+        all_files = list(MODELS_DIR.iterdir())
+        print(f"📁 Models directory contents: {[f.name for f in all_files]}")
+    except Exception as e:
+        print(f"⚠️  Error listing directory: {e}")
+    
+    # Find all .gguf files
+    try:
+        gguf_files = list(MODELS_DIR.glob('*.gguf'))
+        print(f"📦 Found {len(gguf_files)} .gguf files")
+    except Exception as e:
+        print(f"⚠️  Error finding .gguf files: {e}")
+        gguf_files = []
+    
+    for model_file in gguf_files:
+        try:
+            # Skip symlinks that point to current.gguf
+            if model_file.name == 'current.gguf' and model_file.is_symlink():
+                continue
+                
+            stat = model_file.stat()
+            models.append({
+                'name': model_file.name,
+                'size': f"{stat.st_size / (1024**3):.2f} GB",
+                'size_bytes': stat.st_size,
+                'is_active': False  # We're not using current.gguf anymore
+            })
+        except Exception as e:
+            print(f"⚠️  Error processing {model_file.name}: {e}")
+            continue
+    
     return sorted(models, key=lambda x: x['name'])
 
 
@@ -87,10 +114,30 @@ def upload_model():
         return redirect(url_for('index'))
     
     try:
+        # Ensure directory exists
+        MODELS_DIR.mkdir(parents=True, exist_ok=True)
+        
+        # Save file
         file.save(str(filepath))
-        flash(f'Model {filename} uploaded successfully!', 'success')
+        
+        # Verify file was saved
+        if not filepath.exists():
+            flash(f'Upload failed: File was not saved', 'error')
+            return redirect(url_for('index'))
+        
+        # Get file size
+        file_size = filepath.stat().st_size
+        flash(f'Model {filename} uploaded successfully! ({file_size / (1024**3):.2f} GB)', 'success')
+        
+        # Log for debugging
+        print(f"✓ Uploaded: {filepath} ({file_size} bytes)")
+        
     except Exception as e:
-        flash(f'Upload failed: {str(e)}', 'error')
+        import traceback
+        error_msg = f'Upload failed: {str(e)}'
+        print(f"✗ Upload error: {error_msg}")
+        print(traceback.format_exc())
+        flash(error_msg, 'error')
     
     return redirect(url_for('index'))
 
