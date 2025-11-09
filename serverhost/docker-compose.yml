@@ -5,8 +5,10 @@ services:
   llama-server:
     image: ghcr.io/ggerganov/llama.cpp:server
     container_name: llama-cpp-server
+    entrypoint: ["/bin/bash", "/entrypoint.sh"]
     volumes:
-      - ./models:/models:ro  # Read-only access to models
+      - ./models:/models:rw  # Read-write for init script, model files are read-only
+      - ./entrypoint.sh:/entrypoint.sh:ro
     command: >
       --host 0.0.0.0
       --port 8080
@@ -26,10 +28,10 @@ services:
       resources:
         limits:
           cpus: '6'
-          memory: 7G
+          memory: 15G
         reservations:
           cpus: '4'
-          memory: 4G
+          memory: 6G
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
       interval: 30s

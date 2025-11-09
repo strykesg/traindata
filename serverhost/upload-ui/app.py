@@ -109,6 +109,11 @@ def activate_model(model_name):
         # Create symlink to new model
         current_link.symlink_to(model_path.name)
         
+        # Save active model state for persistence across redeploys
+        state_file = MODELS_DIR / '.active_model'
+        with open(state_file, 'w') as f:
+            f.write(model_path.name)
+        
         return jsonify({
             'success': True,
             'message': f'Model {model_name} activated. Restart llama-server to use it.',

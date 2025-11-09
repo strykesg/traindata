@@ -3,9 +3,11 @@ models/*.gguf
 models/*.bin
 models/*.safetensors
 models/current.gguf
+models/.active_model
 
-# Keep the directory
+# Keep the directory and init script
 !models/.gitkeep
+!models/init-models.sh
 
 # Python
 __pycache__/
