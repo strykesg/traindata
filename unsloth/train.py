@@ -2,6 +2,38 @@
 Fine-tune Qwen3-1.7B using Unsloth on vast.ai GTX 5090.
 Uses WandB for logging and HuggingFace for model management.
 """
+# CRITICAL: Patch torch.int1 FIRST, before ANY other imports
+# torchao accesses torch.int1 at import time in a dictionary literal,
+# so we must patch it immediately after importing torch
+import sys
+import torch
+
+# Workaround for torch.int1 compatibility issue
+# Some PyTorch 2.5+ builds don't include torch.int1 (especially CUDA builds)
+if not hasattr(torch, 'int1'):
+    print("Warning: torch.int1 not available in this PyTorch build")
+    print("Applying workaround before unsloth/torchao imports...")
+    
+    # Create a proper int1 dtype placeholder that torchao can use
+    # torchao uses this in a dictionary mapping at import time, so it needs to be hashable
+    class Int1DType:
+        """Placeholder for torch.int1 dtype."""
+        def __repr__(self):
+            return "torch.int1"
+        def __str__(self):
+            return "torch.int1"
+        def __hash__(self):
+            return hash("torch.int1")
+        def __eq__(self, other):
+            return isinstance(other, Int1DType) or str(other) == "torch.int1"
+    
+    # Set it as a class attribute so it behaves like other dtypes
+    torch.int1 = Int1DType()
+    sys.modules['torch'].int1 = torch.int1
+    
+    print("Workaround applied: torch.int1 placeholder created")
+
+# Now safe to import other modules
 import os
 import json
 import wandb
@@ -10,7 +42,6 @@ from datasets import load_dataset
 from unsloth import FastLanguageModel, is_bfloat16_supported
 from trl import SFTTrainer
 from transformers import TrainingArguments
-import torch
 from dotenv import load_dotenv
 
 # Load environment variables from .env file
@@ -215,4 +246,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

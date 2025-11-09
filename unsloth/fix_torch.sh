@@ -10,15 +10,20 @@ if [ -d "venv" ]; then
     source venv/bin/activate
 fi
 
-echo "Upgrading PyTorch to 2.5.0+ (required for unsloth)..."
-pip install --upgrade torch>=2.5.0 torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
+echo "Checking PyTorch version..."
+python -c "import torch; print(f'PyTorch version: {torch.__version__}'); print(f'Has int1: {hasattr(torch, \"int1\")}')"
 
 echo ""
-echo "Verifying PyTorch version..."
-python -c "import torch; print(f'PyTorch version: {torch.__version__}'); print(f'CUDA available: {torch.cuda.is_available()}'); print(f'Has int1: {hasattr(torch, \"int1\")}')"
-
+echo "Note: Some PyTorch 2.5+ builds don't include torch.int1."
+echo "The train.py script includes a workaround for this."
+echo ""
+echo "If you still get errors, try:"
+echo "1. Reinstall PyTorch from nightly build:"
+echo "   pip install --pre torch torchvision torchaudio --index-url https://download.pytorch.org/whl/nightly/cu121"
+echo ""
+echo "2. Or use the workaround in train.py (already included)"
 echo ""
 echo "=========================================="
-echo "Fix complete! Try running train.py again."
+echo "Try running train.py - it should work with the workaround."
 echo "=========================================="
 
