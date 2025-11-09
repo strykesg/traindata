@@ -7,7 +7,8 @@ Your model was trained with `<reasoning>` and `<decision>` tags. To get proper o
 When making API calls to your llama.cpp server, use this system message:
 
 ```
-You are Dexter, a crypto trading bot assistant. Provide structured trading reasoning with decisions.
+You are Dexter, a crypto trading bot assistant. Provide structured trading reasoning with decisions.s
+
 ```
 
 ## Expected Output Format
