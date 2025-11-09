@@ -10,12 +10,39 @@ if [ -d "venv" ]; then
     source venv/bin/activate
 fi
 
-# Find torchao installation
-TORCHAO_PATH=$(python -c "import torchao; import os; print(os.path.dirname(torchao.__file__))" 2>/dev/null || echo "")
+# Find torchao installation without importing it (since import fails)
+# Try multiple methods to find the path
+TORCHAO_PATH=""
 
-if [ -z "$TORCHAO_PATH" ]; then
+# Method 1: Try to find via pip show
+TORCHAO_PATH=$(pip show torchao 2>/dev/null | grep "Location:" | awk '{print $2}')
+if [ -n "$TORCHAO_PATH" ]; then
+    TORCHAO_PATH="$TORCHAO_PATH/torchao"
+fi
+
+# Method 2: Try common site-packages locations
+if [ ! -d "$TORCHAO_PATH" ] || [ -z "$TORCHAO_PATH" ]; then
+    # Find venv or site-packages
+    if [ -d "venv" ]; then
+        TORCHAO_PATH="venv/lib/python$(python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')/site-packages/torchao"
+    else
+        # Try system site-packages
+        TORCHAO_PATH=$(python3 -c "import site; print(site.getsitepackages()[0])" 2>/dev/null)/torchao
+    fi
+fi
+
+# Method 3: Search for it
+if [ ! -d "$TORCHAO_PATH" ] || [ -z "$TORCHAO_PATH" ]; then
+    TORCHAO_PATH=$(find . -type d -name "torchao" -path "*/site-packages/torchao" 2>/dev/null | head -1)
+fi
+
+if [ -z "$TORCHAO_PATH" ] || [ ! -d "$TORCHAO_PATH" ]; then
     echo "ERROR: Could not find torchao installation"
-    echo "Make sure torchao is installed: pip install torchao"
+    echo "Tried: $TORCHAO_PATH"
+    echo "Please specify the path manually or ensure torchao is installed"
+    echo ""
+    echo "To find it manually, run:"
+    echo "  find . -name 'torchao' -type d"
     exit 1
 fi
 
