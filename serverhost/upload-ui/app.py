@@ -210,24 +210,91 @@ def upload_model():
         sys.stdout.flush()
         
         try:
+            # CRITICAL: Ensure directory exists RIGHT before saving
+            # This handles any race conditions or permission issues
+            MODELS_DIR.mkdir(parents=True, exist_ok=True)
+            
+            # Verify directory is actually writable by trying to create a test file
+            test_file = MODELS_DIR / '.write_test'
+            try:
+                test_file.touch()
+                test_file.unlink()
+                print(f"✓ Directory write test passed")
+            except Exception as test_error:
+                print(f"✗ Directory write test failed: {test_error}")
+                raise Exception(f"Cannot write to directory {MODELS_DIR}: {test_error}")
+            
+            sys.stdout.flush()
+            
             # Reset file pointer to beginning
             file.seek(0)
             
             # Use Flask's save method (handles FileStorage correctly)
             # This should complete before we continue
-            print(f"Calling file.save()...")
+            print(f"Calling file.save() to: {filepath}")
+            print(f"Directory exists: {MODELS_DIR.exists()}")
+            print(f"Directory is writable: {os.access(MODELS_DIR, os.W_OK)}")
             sys.stdout.flush()
             
-            # Save the file
-            file.save(str(filepath))
-            print(f"✓ file.save() returned")
+            # Get absolute path to ensure no path issues
+            try:
+                # Try to resolve (works if parent exists)
+                absolute_filepath = filepath.resolve()
+            except (OSError, RuntimeError):
+                # If resolve fails, use absolute() which always works
+                absolute_filepath = filepath.absolute()
+            print(f"Using absolute path: {absolute_filepath}")
+            print(f"Parent directory: {absolute_filepath.parent}")
+            print(f"Parent exists: {absolute_filepath.parent.exists()}")
             sys.stdout.flush()
+            
+            # Save the file - Flask's save method
+            try:
+                # Use absolute path string
+                file.save(str(absolute_filepath))
+                print(f"✓ file.save() returned")
+                sys.stdout.flush()
+            except (FileNotFoundError, OSError) as save_error:
+                # If Flask's save fails, try manual write as fallback
+                print(f"⚠️  Flask save failed ({type(save_error).__name__}), trying manual write: {save_error}")
+                sys.stdout.flush()
+                
+                # Ensure parent directory exists
+                absolute_filepath.parent.mkdir(parents=True, exist_ok=True)
+                
+                # Manual write fallback
+                with open(absolute_filepath, 'wb') as f:
+                    file.seek(0)
+                    written = 0
+                    while True:
+                        chunk = file.read(1024 * 1024)  # 1MB chunks
+                        if not chunk:
+                            break
+                        f.write(chunk)
+                        written += len(chunk)
+                        # Log progress every 100MB
+                        if written % (100 * 1024 * 1024) == 0:
+                            print(f"  Manual write progress: {written / (1024**3):.2f} GB")
+                            sys.stdout.flush()
+                    f.flush()
+                    os.fsync(f.fileno())
+                print(f"✓ Manual write completed: {written} bytes")
+                sys.stdout.flush()
+                
+                # Update filepath reference for rest of function
+                filepath = absolute_filepath
+            else:
+                # Flask save succeeded, use absolute path for consistency
+                filepath = absolute_filepath
             
             # Wait for file to be written (for large files, this may take time)
             import time
             max_wait = 300  # 5 minutes max wait
             wait_interval = 1  # Check every second
             waited = 0
+            
+            print(f"Waiting for file at: {filepath}")
+            sys.stdout.flush()
             
             while waited < max_wait:
                 if filepath.exists():
