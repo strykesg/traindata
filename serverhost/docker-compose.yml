@@ -5,8 +5,6 @@ services:
   llama-server:
     image: ghcr.io/ggerganov/llama.cpp:server
     container_name: llama-cpp-server
-    ports:
-      - "8080:8080"  # llama-server with WebUI
     volumes:
       - ./models:/models:ro  # Read-only access to models
     command: >
@@ -41,8 +39,6 @@ services:
   upload-ui:
     build: ./upload-ui
     container_name: model-upload-ui
-    ports:
-      - "3000:3000"  # Upload UI
     volumes:
       - ./models:/app/models  # Read-write access to models
     environment:
