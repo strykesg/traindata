@@ -183,10 +183,11 @@ def index():
 @app.route('/upload', methods=['POST'])
 def upload_model():
     """Upload a new model"""
-    print(f"\n{'='*50}")
-    print("UPLOAD REQUEST RECEIVED")
-    print(f"{'='*50}")
-    print(f"MODELS_DIR: {MODELS_DIR}")
+    print(f"\n{'='*50}", flush=True)
+    print("UPLOAD REQUEST RECEIVED", flush=True)
+    print(f"{'='*50}", flush=True)
+    print(f"MODELS_DIR: {MODELS_DIR}", flush=True)
+    sys.stdout.flush()
     
     # CRITICAL: Verify directory exists and is accessible BEFORE proceeding
     try:
@@ -204,33 +205,39 @@ def upload_model():
         except Exception as test_error:
             raise Exception(f"Cannot write to directory {MODELS_DIR}: {test_error}")
         
-        print(f"MODELS_DIR exists: {MODELS_DIR.exists()}")
-        print(f"MODELS_DIR is writable: {os.access(MODELS_DIR, os.W_OK)}")
+        print(f"MODELS_DIR exists: {MODELS_DIR.exists()}", flush=True)
+        print(f"MODELS_DIR is writable: {os.access(MODELS_DIR, os.W_OK)}", flush=True)
+        sys.stdout.flush()
     except Exception as dir_error:
         error_msg = f"CRITICAL: Models directory is not accessible: {dir_error}"
-        print(f"✗ {error_msg}")
+        print(f"✗ {error_msg}", flush=True)
         import traceback
-        print(traceback.format_exc())
+        print(traceback.format_exc(), flush=True)
+        sys.stdout.flush()
         flash(f'Upload failed: {error_msg}. Please check Docker volume mount.', 'error')
         return redirect(url_for('index'))
     
     if 'file' not in request.files:
-        print("✗ No file in request.files")
+        print("✗ No file in request.files", flush=True)
+        sys.stdout.flush()
         flash('No file provided', 'error')
         return redirect(url_for('index'))
     
     file = request.files['file']
-    print(f"File object: {file}")
-    print(f"File filename: {file.filename}")
-    print(f"File content_type: {file.content_type}")
+    print(f"File object: {file}", flush=True)
+    print(f"File filename: {file.filename}", flush=True)
+    print(f"File content_type: {file.content_type}", flush=True)
+    sys.stdout.flush()
     
     if file.filename == '':
-        print("✗ Empty filename")
+        print("✗ Empty filename", flush=True)
+        sys.stdout.flush()
         flash('No file selected', 'error')
         return redirect(url_for('index'))
     
     if not allowed_file(file.filename):
-        print(f"✗ Invalid file type: {file.filename}")
+        print(f"✗ Invalid file type: {file.filename}", flush=True)
+        sys.stdout.flush()
         flash('Only .gguf files are allowed', 'error')
         return redirect(url_for('index'))
     
@@ -457,11 +464,13 @@ def upload_model():
     except Exception as e:
         import traceback
         error_msg = f'Upload failed: {str(e)}'
-        print(f"✗ Upload error: {error_msg}")
-        print(traceback.format_exc())
+        print(f"✗ Upload error: {error_msg}", flush=True)
+        print(traceback.format_exc(), flush=True)
+        sys.stdout.flush()
         flash(error_msg, 'error')
     
-    print(f"{'='*50}\n")
+    print(f"{'='*50}\n", flush=True)
+    sys.stdout.flush()
     return redirect(url_for('index'))
 
 
@@ -561,5 +570,8 @@ def request_entity_too_large(error):
 
 
 if __name__ == '__main__':
+    # Ensure unbuffered output for better logging in Docker
+    sys.stdout.reconfigure(line_buffering=True) if hasattr(sys.stdout, 'reconfigure') else None
+    sys.stderr.reconfigure(line_buffering=True) if hasattr(sys.stderr, 'reconfigure') else None
     app.run(host='0.0.0.0', port=3000, debug=True)
 

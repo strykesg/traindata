@@ -32,6 +32,6 @@ echo ""
 echo "Starting Flask application..."
 echo "=========================================="
 
-# Start Flask app
-exec python app.py
+# Start Flask app with unbuffered output for better logging in Docker
+exec python -u app.py
 

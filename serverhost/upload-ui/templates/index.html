@@ -632,6 +632,22 @@
             let lastLoaded = 0;
             let lastTime = startTime;
             
+            // Open and send the request
+            try {
+                xhr.open('POST', '/upload', true);
+                console.log('XHR opened, sending request...');
+                xhr.send(formData);
+                console.log('XHR send() called');
+            } catch (error) {
+                console.error('Error sending XHR:', error);
+                uploadStatus.textContent = '✗ Upload failed: ' + error.message;
+                uploadStatus.className = 'upload-status error';
+                uploadBtn.disabled = false;
+                uploadBtn.textContent = 'Upload Model';
+                progressContainer.classList.remove('active');
+                return;
+            }
+            
             // Upload progress event
             xhr.upload.addEventListener('progress', function(e) {
                 if (e.lengthComputable) {
@@ -731,23 +747,33 @@
             
             // Upload error
             xhr.addEventListener('error', function() {
+                console.error('Upload error:', xhr.status, xhr.statusText, xhr.responseText);
                 uploadStatus.textContent = '✗ Upload failed: Network error';
                 uploadStatus.className = 'upload-status error';
                 uploadBtn.disabled = false;
                 uploadBtn.textContent = 'Upload Model';
+                progressContainer.classList.remove('active');
             });
             
-            // Upload aborted
+            // Upload abort
             xhr.addEventListener('abort', function() {
-                uploadStatus.textContent = 'Upload cancelled';
+                console.log('Upload aborted');
+                uploadStatus.textContent = '✗ Upload cancelled';
                 uploadStatus.className = 'upload-status error';
                 uploadBtn.disabled = false;
                 uploadBtn.textContent = 'Upload Model';
+                progressContainer.classList.remove('active');
             });
             
-            // Start upload
-            xhr.open('POST', '/upload');
-            xhr.send(formData);
+            // Log when upload starts
+            xhr.addEventListener('loadstart', function() {
+                console.log('Upload started');
+            });
+            
+            // Log progress events
+            xhr.upload.addEventListener('loadstart', function() {
+                console.log('Upload progress tracking started');
+            });
         });
     </script>
 </body>
