@@ -42,29 +42,32 @@ file_path = "$QUANT_PRIMITIVES"
 with open(file_path, 'r') as f:
     content = f.read()
 
-# Find and comment out the torch.int1 line
-if 'torch.int1:' in content and '# torch.int1:' not in content:
-    # Replace the problematic line - match various whitespace patterns
-    lines = content.split('\n')
-    patched = False
-    for i, line in enumerate(lines):
-        if 'torch.int1:' in line and '#' not in line.split('torch.int1:')[0]:
+# Find and comment out all problematic torch.int* lines
+lines = content.split('\n')
+patched_types = []
+for i, line in enumerate(lines):
+    # Check for torch.int1, int2, int4, etc. that might not be available
+    for int_type in ['int1', 'int2', 'int4']:
+        if f'torch.{int_type}:' in line and '#' not in line.split(f'torch.{int_type}:')[0]:
             # Comment out this line
             indent = len(line) - len(line.lstrip())
-            lines[i] = ' ' * indent + '# torch.int1: (-(2**0), 2**0 - 1),  # Patched: not available in all PyTorch builds'
-            patched = True
+            # Extract the value part if present
+            if ':' in line:
+                value_part = line.split(':', 1)[1].strip()
+                lines[i] = f'{" " * indent}# torch.{int_type}: {value_part}  # Patched: not available in all PyTorch builds'
+            else:
+                lines[i] = f'{" " * indent}# torch.{int_type}: ...  # Patched: not available in all PyTorch builds'
+            patched_types.append(int_type)
             break
-    
-    if patched:
-        content = '\n'.join(lines)
-        with open(file_path, 'w') as f:
-            f.write(content)
-        print("Successfully patched quant_primitives.py")
-        print("The torch.int1 line has been commented out")
-    else:
-        print("Warning: Could not find uncommented torch.int1 line (may already be patched)")
+
+if patched_types:
+    content = '\n'.join(lines)
+    with open(file_path, 'w') as f:
+        f.write(content)
+    print(f"Successfully patched quant_primitives.py")
+    print(f"Commented out: {', '.join(f'torch.{t}' for t in patched_types)}")
 else:
-    print("Warning: torch.int1 line not found or already patched")
+    print("Warning: No torch.int* lines found to patch (may already be patched)")
 PYTHON_SCRIPT
 
 echo ""

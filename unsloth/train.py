@@ -8,30 +8,38 @@ Uses WandB for logging and HuggingFace for model management.
 import sys
 import torch
 
-# Workaround for torch.int1 compatibility issue
-# Some PyTorch 2.5+ builds don't include torch.int1 (especially CUDA builds)
-if not hasattr(torch, 'int1'):
-    print("Warning: torch.int1 not available in this PyTorch build")
-    print("Applying workaround before unsloth/torchao imports...")
-    
-    # Create a proper int1 dtype placeholder that torchao can use
-    # torchao uses this in a dictionary mapping at import time, so it needs to be hashable
-    class Int1DType:
-        """Placeholder for torch.int1 dtype."""
+# Workaround for torch.int1/int2 compatibility issue
+# Some PyTorch 2.5+ builds don't include torch.int1/int2 (especially CUDA builds)
+# torchao uses these in dictionary mappings at import time, so we must patch them first
+
+def create_int_dtype(name):
+    """Create a placeholder dtype for missing torch.int types."""
+    class IntDType:
+        """Placeholder for torch int dtype."""
+        def __init__(self, dtype_name):
+            self.dtype_name = dtype_name
         def __repr__(self):
-            return "torch.int1"
+            return f"torch.{self.dtype_name}"
         def __str__(self):
-            return "torch.int1"
+            return f"torch.{self.dtype_name}"
         def __hash__(self):
-            return hash("torch.int1")
+            return hash(f"torch.{self.dtype_name}")
         def __eq__(self, other):
-            return isinstance(other, Int1DType) or str(other) == "torch.int1"
-    
-    # Set it as a class attribute so it behaves like other dtypes
-    torch.int1 = Int1DType()
-    sys.modules['torch'].int1 = torch.int1
-    
-    print("Workaround applied: torch.int1 placeholder created")
+            return isinstance(other, IntDType) and other.dtype_name == self.dtype_name or str(other) == f"torch.{self.dtype_name}"
+    return IntDType(name)
+
+# Patch all missing int types that torchao might use
+missing_types = []
+for int_type in ['int1', 'int2', 'int4']:
+    if not hasattr(torch, int_type):
+        setattr(torch, int_type, create_int_dtype(int_type))
+        sys.modules['torch'].__dict__[int_type] = getattr(torch, int_type)
+        missing_types.append(int_type)
+
+if missing_types:
+    print(f"Warning: torch types {missing_types} not available in this PyTorch build")
+    print("Applying workaround before unsloth/torchao imports...")
+    print(f"Workaround applied: {', '.join(f'torch.{t}' for t in missing_types)} placeholders created")
 
 # Now safe to import other modules
 import os
