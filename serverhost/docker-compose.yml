@@ -21,13 +21,13 @@ services:
       - --ctx-size
       - "42328"
       - --threads
-      - "5"
+      - "7"
       - --threads-batch
       - "5"
       - --n-gpu-layers
       - "0"
       - --parallel
-      - "2"
+      - "1"
       - --cont-batching
       - --no-mmap
       - --mlock
