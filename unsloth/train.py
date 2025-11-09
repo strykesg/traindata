@@ -2,61 +2,6 @@
 Fine-tune Qwen3-1.7B using Unsloth on vast.ai GTX 5090.
 Uses WandB for logging and HuggingFace for model management.
 """
-# CRITICAL: Patch torch.int1 FIRST, before ANY other imports
-# torchao accesses torch.int1 at import time in a dictionary literal,
-# so we must patch it immediately after importing torch
-import sys
-import torch
-
-# Workaround for torch.int1/int2 compatibility issue
-# Some PyTorch 2.5+ builds don't include torch.int1/int2 (especially CUDA builds)
-# torchao uses these in dictionary mappings at import time, so we must patch them first
-
-def create_int_dtype(name):
-    """Create a placeholder dtype for missing torch.int types."""
-    class IntDType:
-        """Placeholder for torch int dtype."""
-        def __init__(self, dtype_name):
-            self.dtype_name = dtype_name
-        def __repr__(self):
-            return f"torch.{self.dtype_name}"
-        def __str__(self):
-            return f"torch.{self.dtype_name}"
-        def __hash__(self):
-            return hash(f"torch.{self.dtype_name}")
-        def __eq__(self, other):
-            return isinstance(other, IntDType) and other.dtype_name == self.dtype_name or str(other) == f"torch.{self.dtype_name}"
-    return IntDType(name)
-
-# Patch all missing int types that torchao might use
-# torchao uses int1, int2, int3, int4, int5, etc. - we'll patch dynamically
-missing_types = []
-# Try common ones first, but the file patch handles all
-for int_type in ['int1', 'int2', 'int3', 'int4', 'int5', 'int6', 'int7', 'int8']:
-    if not hasattr(torch, int_type):
-        setattr(torch, int_type, create_int_dtype(int_type))
-        sys.modules['torch'].__dict__[int_type] = getattr(torch, int_type)
-        missing_types.append(int_type)
-
-if missing_types:
-    print(f"Warning: torch types {missing_types} not available in this PyTorch build")
-    print("Applying workaround before unsloth/torchao imports...")
-    print(f"Workaround applied: {', '.join(f'torch.{t}' for t in missing_types)} placeholders created")
-    
-    # Also try to patch torchao file directly as backup (handles ALL int types)
-    try:
-        import subprocess
-        script_path = os.path.join(os.path.dirname(__file__), 'patch_torchao_complete.py')
-        if os.path.exists(script_path):
-            result = subprocess.run([sys.executable, script_path], 
-                                  capture_output=True, text=True, timeout=10, cwd=os.path.dirname(__file__))
-            if result.returncode == 0 and 'SUCCESS' in result.stdout:
-                print("Also patched torchao file directly (commented out all torch.int* lines)")
-    except Exception as e:
-        print(f"Note: Could not auto-patch torchao file: {e}")
-        print("Run manually: python patch_torchao_complete.py")
-
-# Now safe to import other modules
 import os
 import json
 import wandb
@@ -65,6 +10,7 @@ from datasets import load_dataset
 from unsloth import FastLanguageModel, is_bfloat16_supported
 from trl import SFTTrainer
 from transformers import TrainingArguments
+import torch
 from dotenv import load_dotenv
 
 # Load environment variables from .env file
@@ -269,3 +215,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+

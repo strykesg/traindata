@@ -139,27 +139,6 @@ response = tokenizer.decode(outputs[0], skip_special_tokens=True)
 
 ## Troubleshooting
 
-### PyTorch Compatibility Error (`torch.int1` not found)
-If you see `AttributeError: module 'torch' has no attribute 'int1'`:
-
-**Solution 1 (Recommended):** The `train.py` script includes an automatic workaround. Just run:
-```bash
-python train.py
-```
-The script will automatically patch `torch.int1` before importing unsloth.
-
-**Solution 2:** If the automatic patch doesn't work, directly patch torchao:
-```bash
-bash fix_torchao.sh
-```
-
-**Solution 3:** Try PyTorch nightly build (may have torch.int1):
-```bash
-pip install --pre torch torchvision torchaudio --index-url https://download.pytorch.org/whl/nightly/cu121
-```
-
-**Note:** Some PyTorch 2.5+ builds don't include `torch.int1` (especially CUDA builds). The train.py script includes an automatic workaround that should handle this.
-
 ### Out of Memory
 - Reduce `BATCH_SIZE`
 - Increase `GRADIENT_ACCUMULATION_STEPS`

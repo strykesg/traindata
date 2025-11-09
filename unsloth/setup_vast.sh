@@ -61,9 +61,9 @@ source venv/bin/activate
 echo "Upgrading pip..."
 pip install --upgrade pip
 
-# Install PyTorch with CUDA support (PyTorch 2.5+ required for unsloth compatibility)
-echo "Installing PyTorch 2.5+ (required for unsloth)..."
-pip install torch>=2.5.0 torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
+# Install PyTorch with CUDA support (adjust CUDA version as needed)
+echo "Installing PyTorch..."
+pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
 
 # Install requirements
 echo "Installing requirements..."
