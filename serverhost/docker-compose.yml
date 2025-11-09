@@ -5,7 +5,7 @@ services:
   llama-server:
     image: ghcr.io/ggerganov/llama.cpp:server
     container_name: llama-cpp-server
-    entrypoint: ["/bin/bash", "-c"]
+    entrypoint: ["/bin/bash", "/entrypoint.sh"]
     volumes:
       - ./models:/models:rw  # Read-write for init script, model files are read-only
       - ./entrypoint.sh:/entrypoint.sh:ro
