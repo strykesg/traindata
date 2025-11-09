@@ -88,3 +88,41 @@ bash setup_vast.sh
 ```
 
 This will re-run the entire setup and apply the fix at the end.
+
+---
+
+## Problem 2: torchvision::nms Error
+
+If you see this error after fixing the torch.int1 issue:
+```
+RuntimeError: operator torchvision::nms does not exist
+```
+
+This means torchvision was compiled for a different PyTorch version. The versions must match exactly.
+
+### Fix for torchvision error:
+
+```bash
+cd /workspace/traindata/unsloth
+source venv/bin/activate
+bash fix_torchvision.sh
+```
+
+This script will:
+1. Uninstall all torch-related packages
+2. Reinstall PyTorch 2.5.1 + torchvision 0.20.1 (matching versions)
+3. Reinstall unsloth
+4. Verify everything works
+
+### Manual fix:
+```bash
+pip uninstall -y torch torchvision torchaudio
+pip install torch==2.5.1 torchvision==0.20.1 torchaudio==2.5.1 --index-url https://download.pytorch.org/whl/cu121
+pip install --upgrade --force-reinstall "unsloth[colab-new] @ git+https://github.com/unslothai/unsloth.git"
+```
+
+Then test:
+```bash
+python -c "from torchvision.transforms import InterpolationMode; print('✓ torchvision works')"
+python -c "from unsloth import FastLanguageModel; print('✓ unsloth works')"
+```

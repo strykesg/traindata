@@ -39,8 +39,24 @@ def check_torch():
         else:
             print("❌ torch.int1 NOT supported")
             print("   -> You need PyTorch 2.5.1+")
-            print("   -> Run: bash fix_torch.sh")
+            print("   -> Run: bash fix_torch.sh or python fix_torchao.py")
             return False
+        
+        # Check torchvision compatibility
+        try:
+            import torchvision
+            print(f"✅ torchvision {torchvision.__version__}")
+            
+            # Test if torchvision works with this PyTorch version
+            try:
+                from torchvision.transforms import InterpolationMode
+                print("✅ torchvision compatible with PyTorch")
+            except Exception as e:
+                print(f"❌ torchvision NOT compatible: {e}")
+                print("   -> Run: bash fix_torchvision.sh")
+                return False
+        except ImportError:
+            print("⚠️  torchvision not installed")
         
         return True
     except ImportError:

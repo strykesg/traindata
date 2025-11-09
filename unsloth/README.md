@@ -168,6 +168,24 @@ This patches the torchao library to handle missing int types gracefully. Run it 
 - Patches `quant_primitives.py` to only use int types that exist in your PyTorch build
 - Safe to run multiple times (checks if already patched)
 
+### RuntimeError: operator torchvision::nms does not exist
+
+This error occurs when torchvision is compiled for a different PyTorch version than what's installed.
+
+**Fix:**
+```bash
+bash fix_torchvision.sh
+```
+
+**Manual fix:**
+```bash
+pip uninstall -y torch torchvision torchaudio
+pip install torch==2.5.1 torchvision==0.20.1 torchaudio==2.5.1 --index-url https://download.pytorch.org/whl/cu121
+pip install --upgrade --force-reinstall "unsloth[colab-new] @ git+https://github.com/unslothai/unsloth.git"
+```
+
+The key is to install matching versions of torch and torchvision together.
+
 ### Out of Memory
 - Reduce `BATCH_SIZE`
 - Increase `GRADIENT_ACCUMULATION_STEPS`
