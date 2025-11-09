@@ -33,14 +33,20 @@ echo ""
 echo "Step 2: Installing PyTorch 2.5.1 with matching torchvision (CUDA 12.1)..."
 pip install torch==2.5.1 torchvision==0.20.1 torchaudio==2.5.1 --index-url https://download.pytorch.org/whl/cu121
 
-# Reinstall unsloth
+# Reinstall unsloth WITHOUT upgrading dependencies (critical!)
 echo ""
-echo "Step 3: Reinstalling unsloth..."
-pip install --upgrade --force-reinstall "unsloth[colab-new] @ git+https://github.com/unslothai/unsloth.git"
+echo "Step 3: Reinstalling unsloth (without upgrading torch)..."
+pip install --no-deps --force-reinstall "unsloth[colab-new] @ git+https://github.com/unslothai/unsloth.git" || \
+pip install --no-deps --force-reinstall "unsloth @ git+https://github.com/unslothai/unsloth.git"
+
+# Install other dependencies (but don't upgrade torch)
+echo ""
+echo "Step 4: Installing other dependencies..."
+pip install --upgrade transformers accelerate bitsandbytes peft trl datasets wandb huggingface-hub python-dotenv
 
 # Verify installation
 echo ""
-echo "Step 4: Verifying installation..."
+echo "Step 5: Verifying installation..."
 python -c "
 import torch
 import torchvision
