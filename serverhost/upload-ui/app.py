@@ -11,6 +11,9 @@ from werkzeug.utils import secure_filename
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'your-secret-key-change-in-production')
 
+# Configure max file size (10GB for large models)
+app.config['MAX_CONTENT_LENGTH'] = 10 * 1024 * 1024 * 1024  # 10GB
+
 MODELS_DIR = Path(os.environ.get('MODELS_DIR', '/app/models'))
 LLAMA_SERVER_URL = os.environ.get('LLAMA_SERVER_URL', 'http://llama-server:8080')
 ALLOWED_EXTENSIONS = {'gguf'}
@@ -157,6 +160,12 @@ def api_server_status():
         'healthy': healthy,
         'url': LLAMA_SERVER_URL
     })
+
+
+@app.errorhandler(413)
+def request_entity_too_large(error):
+    """Handle file size too large error"""
+    return jsonify({'error': 'File too large. Maximum size is 10GB.'}), 413
 
 
 if __name__ == '__main__':
