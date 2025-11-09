@@ -52,13 +52,20 @@ services:
     build: ./upload-ui
     container_name: model-upload-ui
     volumes:
-      - ./models:/app/models  # Read-write access to models
+      - ./models:/app/models:rw  # Read-write access to models (explicit rw)
     environment:
       - MODELS_DIR=/app/models
       - LLAMA_SERVER_URL=http://llama-server:8080
     restart: unless-stopped
     depends_on:
       - llama-server
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/server/status"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    # Ensure models directory exists on host
+    init: true
 
 volumes:
   models:

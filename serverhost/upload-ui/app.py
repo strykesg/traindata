@@ -20,7 +20,47 @@ MODELS_DIR = Path(os.environ.get('MODELS_DIR', '/app/models'))
 LLAMA_SERVER_URL = os.environ.get('LLAMA_SERVER_URL', 'http://llama-server:8080')
 ALLOWED_EXTENSIONS = {'gguf'}
 
-MODELS_DIR.mkdir(exist_ok=True)
+
+def initialize_models_directory():
+    """Initialize models directory on startup"""
+    print(f"\n{'='*60}")
+    print("Upload UI Initialization")
+    print(f"{'='*60}")
+    
+    # Ensure directory exists
+    try:
+        MODELS_DIR.mkdir(parents=True, exist_ok=True)
+        print(f"✓ Models directory ensured: {MODELS_DIR}")
+    except Exception as e:
+        print(f"✗ Failed to create models directory: {e}")
+        sys.exit(1)
+    
+    # Check write permissions
+    if not os.access(MODELS_DIR, os.W_OK):
+        print(f"✗ Models directory is not writable: {MODELS_DIR}")
+        sys.exit(1)
+    print(f"✓ Models directory is writable")
+    
+    # List existing models
+    try:
+        existing_models = list(MODELS_DIR.glob('*.gguf'))
+        print(f"✓ Found {len(existing_models)} existing model(s):")
+        for model in existing_models:
+            size = model.stat().st_size
+            print(f"  - {model.name} ({size / (1024**3):.2f} GB)")
+    except Exception as e:
+        print(f"⚠️  Error listing models: {e}")
+    
+    # Check for symlinks (old current.gguf)
+    current_link = MODELS_DIR / 'current.gguf'
+    if current_link.exists() or current_link.is_symlink():
+        print(f"⚠️  Found old current.gguf symlink (will be ignored)")
+    
+    print(f"{'='*60}\n")
+
+
+# Initialize on import
+initialize_models_directory()
 
 
 def allowed_file(filename):
@@ -82,8 +122,18 @@ def check_llama_server_health():
 @app.route('/')
 def index():
     """Main page - model management"""
+    # Re-verify models directory on each request (ensures persistence)
+    try:
+        MODELS_DIR.mkdir(parents=True, exist_ok=True)
+    except Exception as e:
+        print(f"⚠️  Warning: Could not ensure models directory: {e}")
+    
     models = get_models()
     server_healthy = check_llama_server_health()
+    
+    # Log model count for debugging
+    print(f"📊 Serving index page with {len(models)} models")
+    
     return render_template('index.html', 
                          models=models, 
                          server_healthy=server_healthy,
@@ -144,12 +194,45 @@ def upload_model():
         file.seek(0)
         print(f"File size: {file_size} bytes ({file_size / (1024**3):.2f} GB)")
         
-        # Save file
+        # Save file with explicit persistence
         print(f"Saving to: {filepath}")
-        sys.stdout.flush()  # Ensure logs are visible immediately
-        file.save(str(filepath))
-        print(f"✓ File.save() completed")
         sys.stdout.flush()
+        
+        # Use chunked writing for large files to ensure persistence
+        CHUNK_SIZE = 1024 * 1024  # 1MB chunks
+        written = 0
+        
+        try:
+            with open(filepath, 'wb') as f:
+                while True:
+                    chunk = file.read(CHUNK_SIZE)
+                    if not chunk:
+                        break
+                    f.write(chunk)
+                    written += len(chunk)
+                    # Flush every 100MB to ensure persistence
+                    if written % (100 * 1024 * 1024) == 0:
+                        f.flush()
+                        os.fsync(f.fileno())
+                        print(f"  Progress: {written / (1024**3):.2f} GB written...")
+                        sys.stdout.flush()
+            
+            # Final sync to ensure all data is written to disk
+            fd = os.open(str(filepath), os.O_RDONLY)
+            try:
+                os.fsync(fd)
+            finally:
+                os.close(fd)
+            print(f"✓ File.save() completed with explicit persistence")
+            sys.stdout.flush()
+        except Exception as save_error:
+            # Clean up partial file on error
+            if filepath.exists():
+                try:
+                    filepath.unlink()
+                except:
+                    pass
+            raise save_error
         
         # Verify file was saved
         if not filepath.exists():
@@ -163,13 +246,25 @@ def upload_model():
         print(f"  Path: {filepath}")
         print(f"  Size: {saved_size} bytes ({saved_size / (1024**3):.2f} GB)")
         print(f"  Expected: {file_size} bytes")
+        print(f"  Written: {written} bytes")
         
         if saved_size != file_size:
             print(f"⚠️  Size mismatch! Expected {file_size}, got {saved_size}")
+            if saved_size < file_size:
+                print(f"⚠️  File appears incomplete!")
+                filepath.unlink()
+                flash(f'Upload failed: File incomplete ({saved_size} of {file_size} bytes)', 'error')
+                return redirect(url_for('index'))
         
         # Verify file is readable
         if not os.access(filepath, os.R_OK):
             print(f"⚠️  File is not readable!")
+        
+        # Set proper permissions
+        os.chmod(filepath, 0o644)
+        
+        print(f"✓ File permissions set: {oct(filepath.stat().st_mode)}")
+        sys.stdout.flush()
         
         flash(f'Model {filename} uploaded successfully! ({saved_size / (1024**3):.2f} GB)', 'success')
         
