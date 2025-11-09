@@ -46,17 +46,59 @@ try:
     
     # Read and patch
     with open(quant_primitives, 'r') as f:
-        lines = f.readlines()
+        content = f.read()
     
+    # Find the dictionary that contains torch.int* entries
+    # Look for the pattern where torch.int* is used in a dictionary
+    # We'll wrap it in a try/except or comment out all torch.int* lines
+    
+    lines = content.split('\n')
     patched = False
+    
+    # Find the dictionary block (usually starts with something like "DTYPE_TO_RANGE = {")
+    dict_start = -1
+    dict_end = -1
+    in_dict = False
+    indent_level = 0
+    
     for i, line in enumerate(lines):
-        # Comment out any torch.int* lines that aren't already commented
-        if 'torch.int' in line and ':' in line and not line.strip().startswith('#'):
-            # Check if it's a dictionary entry line
-            if any(f'torch.int{x}:' in line for x in [1, 2, 3, 4]):
-                indent = len(line) - len(line.lstrip())
-                lines[i] = ' ' * indent + '# ' + line.lstrip()
-                patched = True
+        # Look for dictionary definition
+        if 'DTYPE_TO_RANGE' in line or 'dtype_to_range' in line or ('{' in line and 'torch.int' in content[max(0, i-5):i+5]):
+            if '{' in line:
+                dict_start = i
+                in_dict = True
+                # Count opening braces to find end
+                brace_count = line.count('{') - line.count('}')
+                indent_level = len(line) - len(line.lstrip())
+                continue
+        
+        if in_dict:
+            brace_count += line.count('{') - line.count('}')
+            if brace_count == 0 and '}' in line:
+                dict_end = i
+                break
+    
+    # If we found a dictionary, patch all torch.int* lines in it
+    if dict_start >= 0:
+        for i in range(dict_start, min(dict_end + 1 if dict_end >= 0 else len(lines), len(lines))):
+            line = lines[i]
+            # Comment out any torch.int* lines (int1, int2, int3, int4, int5, etc.)
+            if 'torch.int' in line and ':' in line and not line.strip().startswith('#'):
+                # Check if it matches pattern torch.int<digit>:
+                import re
+                if re.search(r'torch\.int\d+:', line):
+                    indent = len(line) - len(line.lstrip())
+                    lines[i] = ' ' * indent + '# ' + line.lstrip() + '  # Patched: not available in all PyTorch builds'
+                    patched = True
+    else:
+        # Fallback: just comment out all torch.int* lines
+        for i, line in enumerate(lines):
+            if 'torch.int' in line and ':' in line and not line.strip().startswith('#'):
+                import re
+                if re.search(r'torch\.int\d+:', line):
+                    indent = len(line) - len(line.lstrip())
+                    lines[i] = ' ' * indent + '# ' + line.lstrip() + '  # Patched: not available in all PyTorch builds'
+                    patched = True
     
     if patched:
         with open(quant_primitives, 'w') as f:

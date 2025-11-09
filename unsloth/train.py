@@ -28,9 +28,11 @@ def create_int_dtype(name):
             return isinstance(other, IntDType) and other.dtype_name == self.dtype_name or str(other) == f"torch.{self.dtype_name}"
     return IntDType(name)
 
-# Patch all missing int types that torchao might use (int1, int2, int3, int4)
+# Patch all missing int types that torchao might use
+# torchao uses int1, int2, int3, int4, int5, etc. - we'll patch dynamically
 missing_types = []
-for int_type in ['int1', 'int2', 'int3', 'int4']:
+# Try common ones first, but the file patch handles all
+for int_type in ['int1', 'int2', 'int3', 'int4', 'int5', 'int6', 'int7', 'int8']:
     if not hasattr(torch, int_type):
         setattr(torch, int_type, create_int_dtype(int_type))
         sys.modules['torch'].__dict__[int_type] = getattr(torch, int_type)
@@ -41,15 +43,18 @@ if missing_types:
     print("Applying workaround before unsloth/torchao imports...")
     print(f"Workaround applied: {', '.join(f'torch.{t}' for t in missing_types)} placeholders created")
     
-    # Also try to patch torchao file directly as backup
+    # Also try to patch torchao file directly as backup (handles ALL int types)
     try:
         import subprocess
-        result = subprocess.run([sys.executable, 'patch_torchao_simple.py'], 
-                              capture_output=True, text=True, timeout=10)
-        if result.returncode == 0:
-            print("Also patched torchao file directly as backup")
-    except:
-        pass  # Ignore if patch script fails
+        script_path = os.path.join(os.path.dirname(__file__), 'patch_torchao_complete.py')
+        if os.path.exists(script_path):
+            result = subprocess.run([sys.executable, script_path], 
+                                  capture_output=True, text=True, timeout=10, cwd=os.path.dirname(__file__))
+            if result.returncode == 0 and 'SUCCESS' in result.stdout:
+                print("Also patched torchao file directly (commented out all torch.int* lines)")
+    except Exception as e:
+        print(f"Note: Could not auto-patch torchao file: {e}")
+        print("Run manually: python patch_torchao_complete.py")
 
 # Now safe to import other modules
 import os
