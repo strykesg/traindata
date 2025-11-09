@@ -9,27 +9,40 @@ echo "=========================================="
 echo "llama-server Entrypoint"
 echo "=========================================="
 
-# Find llama-server binary (it might be in different locations)
+# Find llama-server binary
+# The llama.cpp Docker image should have it in PATH or /usr/local/bin
 LLAMA_SERVER=""
-for path in "/usr/local/bin/llama-server" "/app/llama-server" "/llama-server" "llama-server"; do
-    if command -v "$path" >/dev/null 2>&1; then
-        LLAMA_SERVER="$path"
-        break
+
+# First try command -v (checks PATH)
+if command -v llama-server >/dev/null 2>&1; then
+    LLAMA_SERVER="llama-server"
+else
+    # Search common locations
+    for path in "/usr/local/bin/llama-server" "/app/bin/llama-server" "/llama-server" "/usr/bin/llama-server"; do
+        if [ -f "$path" ] && [ -x "$path" ]; then
+            LLAMA_SERVER="$path"
+            break
+        fi
+    done
+    
+    # Last resort: search for it
+    if [ -z "$LLAMA_SERVER" ]; then
+        FOUND=$(find /usr /app /bin /sbin -name "llama-server" -type f -executable 2>/dev/null | head -1)
+        if [ -n "$FOUND" ]; then
+            LLAMA_SERVER="$FOUND"
+        fi
     fi
-done
+fi
 
 if [ -z "$LLAMA_SERVER" ]; then
-    # Try to find it in common locations
-    if [ -f "/usr/local/bin/llama-server" ]; then
-        LLAMA_SERVER="/usr/local/bin/llama-server"
-    elif [ -f "/app/llama-server" ]; then
-        LLAMA_SERVER="/app/llama-server"
-    else
-        echo "❌ ERROR: llama-server binary not found!"
-        echo "Searching for llama-server..."
-        find / -name "llama-server" -type f 2>/dev/null | head -5
-        exit 1
-    fi
+    echo "❌ ERROR: llama-server binary not found!"
+    echo "Checking PATH: $PATH"
+    echo "Searching for llama-server..."
+    find / -name "llama-server" -type f 2>/dev/null | head -10
+    echo ""
+    echo "Trying to use default entrypoint..."
+    # Fall back to default entrypoint - just execute what was passed
+    exec "$@"
 fi
 
 echo "✓ Found llama-server at: $LLAMA_SERVER"
