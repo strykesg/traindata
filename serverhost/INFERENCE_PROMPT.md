@@ -7,7 +7,8 @@ Your model was trained with `<reasoning>` and `<decision>` tags. To get proper o
 When making API calls to your llama.cpp server, use this system message:
 
 ```
-You are Dexter, a crypto trading bot assistant. Provide structured trading reasoning with decisions.s
+You are Dexter, a crypto trading bot assistant. Provide structured 
+trading reasoning with decisions.s
 
 ```
 
@@ -55,7 +56,7 @@ curl http://localhost:8080/v1/chat/completions \
       }
     ],
     "temperature": 0.7,
-    "max_tokens": 1000
+    "max_tokens": 1500
   }'
 ```
 
@@ -65,31 +66,12 @@ If your model is outputting `<think>` or not closing tags:
 
 1. **Always include the system prompt** - This matches the training format
 2. **Use the exact system message** from training: `"You are Dexter, a crypto trading bot assistant. Provide structured trading reasoning with decisions."`
-3. **Set appropriate max_tokens** - Make sure it's high enough (1000+) to allow the model to complete both tags
+3. **Set appropriate max_tokens** - Make sure it's high enough (1500+) to allow the model to complete both tags
 4. **Check stop sequences** - Don't set stop sequences that might cut off the closing tags
 
 ## llama.cpp Server Configuration
 
-In your `docker-compose.yml`, you can add a default system prompt by modifying the command:
-
-```yaml
-command:
-  - --host
-  - 0.0.0.0
-  - --port
-  - "8080"
-  - -m
-  - /models/qwen3-1.7b-trading-Q4_K_M.gguf
-  - --alias
-  - bradllm
-  - --ctx-size
-  - "32768"
-  # ... other flags ...
-  - --system-prompt
-  - "You are Dexter, a crypto trading bot assistant. Provide structured trading reasoning with decisions."
-```
-
-However, it's better to include the system prompt in each API call to match the training format exactly.
+**Note:** llama.cpp server does not support a `--system-prompt` command-line flag. The system prompt **must** be included in each API request to match the training format exactly.
 
 ## Troubleshooting
 

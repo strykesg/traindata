@@ -42,8 +42,6 @@ services:
       - "512"
       - --ubatch-size
       - "512"
-      - --system-prompt
-      - "You are Dexter, a crypto trading bot assistant. Provide structured trading reasoning with decisions."
     restart: unless-stopped
     shm_size: '2gb'
     ulimits:
