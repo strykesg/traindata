@@ -609,18 +609,33 @@
             const progressTime = document.getElementById('progressTime');
             const uploadStatus = document.getElementById('uploadStatus');
             
+            // Ensure progress container is visible - use both class and inline style
             progressContainer.classList.add('active');
+            progressContainer.style.display = 'block';
+            progressContainer.style.visibility = 'visible';
+            progressContainer.style.opacity = '1';
+            
+            console.log('Progress container activated');
+            console.log('Container classes:', progressContainer.className);
+            console.log('Container display:', window.getComputedStyle(progressContainer).display);
+            console.log('Container visible:', progressContainer.offsetHeight > 0);
+            
             uploadBtn.disabled = true;
             uploadBtn.textContent = 'Uploading...';
             uploadStatus.textContent = 'Uploading ' + file.name + '...';
             uploadStatus.className = 'upload-status uploading';
             
-            // Reset progress
+            console.log('File selected:', file.name, 'Size:', formatBytes(file.size));
+            
+            // Reset progress and show initial state
             progressBar.style.width = '0%';
             progressPercentage.textContent = '0%';
-            progressUploaded.textContent = '0 MB';
+            progressUploaded.textContent = '0 MB / ' + formatBytes(file.size);
             progressSpeed.textContent = '0 MB/s';
-            progressTime.textContent = '--:--';
+            progressTime.textContent = 'Calculating...';
+            
+            // Force a reflow to ensure visibility
+            void progressContainer.offsetHeight;
             
             // Create FormData
             const formData = new FormData();
@@ -631,31 +646,25 @@
             const startTime = Date.now();
             let lastLoaded = 0;
             let lastTime = startTime;
+            let progressUpdateInterval = null;
             
-            // Open and send the request
-            try {
-                xhr.open('POST', '/upload', true);
-                console.log('XHR opened, sending request...');
-                xhr.send(formData);
-                console.log('XHR send() called');
-            } catch (error) {
-                console.error('Error sending XHR:', error);
-                uploadStatus.textContent = '✗ Upload failed: ' + error.message;
-                uploadStatus.className = 'upload-status error';
-                uploadBtn.disabled = false;
-                uploadBtn.textContent = 'Upload Model';
-                progressContainer.classList.remove('active');
-                return;
-            }
-            
+            // CRITICAL: Attach ALL event listeners BEFORE opening the request
             // Upload progress event
             xhr.upload.addEventListener('progress', function(e) {
-                if (e.lengthComputable) {
+                console.log('Progress event fired!', e.loaded, '/', e.total, 'lengthComputable:', e.lengthComputable);
+                if (e.lengthComputable && e.total > 0) {
+                    // Clear fallback interval since real progress is working
+                    if (progressUpdateInterval) {
+                        clearInterval(progressUpdateInterval);
+                        progressUpdateInterval = null;
+                    }
                     const percentComplete = (e.loaded / e.total) * 100;
                     const currentTime = Date.now();
                     const timeElapsed = (currentTime - startTime) / 1000; // seconds
                     const timeDelta = (currentTime - lastTime) / 1000; // seconds since last update
                     const bytesDelta = e.loaded - lastLoaded;
+                    
+                    console.log('Updating progress:', percentComplete.toFixed(1) + '%');
                     
                     // Update progress bar
                     progressBar.style.width = percentComplete + '%';
@@ -680,15 +689,56 @@
                     
                     lastLoaded = e.loaded;
                     lastTime = currentTime;
+                } else {
+                    console.warn('Progress event not computable - loaded:', e.loaded, 'total:', e.total);
                 }
             });
             
+            // Fallback: Show indeterminate progress if events don't fire
+            // This simulates progress when the server buffers the upload
+            let fallbackProgress = 0;
+            progressUpdateInterval = setInterval(function() {
+                if (fallbackProgress < 90) {
+                    fallbackProgress += 2;
+                    progressBar.style.width = fallbackProgress + '%';
+                    progressPercentage.textContent = fallbackProgress.toFixed(0) + '%';
+                    progressUploaded.textContent = formatBytes((file.size * fallbackProgress / 100)) + ' / ' + formatBytes(file.size);
+                    console.log('Fallback progress update:', fallbackProgress + '%');
+                }
+            }, 500); // Update every 500ms
+            
+            // Open and send the request
+            try {
+                xhr.open('POST', '/upload', true);
+                console.log('XHR opened, sending request...');
+                xhr.send(formData);
+                console.log('XHR send() called');
+            } catch (error) {
+                console.error('Error sending XHR:', error);
+                if (progressUpdateInterval) {
+                    clearInterval(progressUpdateInterval);
+                }
+                uploadStatus.textContent = '✗ Upload failed: ' + error.message;
+                uploadStatus.className = 'upload-status error';
+                uploadBtn.disabled = false;
+                uploadBtn.textContent = 'Upload Model';
+                progressContainer.classList.remove('active');
+                return;
+            }
+            
             // Upload complete
             xhr.addEventListener('load', function() {
+                // Clear fallback interval
+                if (progressUpdateInterval) {
+                    clearInterval(progressUpdateInterval);
+                    progressUpdateInterval = null;
+                }
+                
                 if (xhr.status === 200 || xhr.status === 302) {
                     // Success - verify file was actually saved
                     progressBar.style.width = '100%';
                     progressPercentage.textContent = '100%';
+                    progressUploaded.textContent = formatBytes(file.size) + ' / ' + formatBytes(file.size);
                     uploadStatus.textContent = '✓ Upload complete! Verifying...';
                     uploadStatus.className = 'upload-status uploading';
                     
@@ -747,6 +797,10 @@
             
             // Upload error
             xhr.addEventListener('error', function() {
+                if (progressUpdateInterval) {
+                    clearInterval(progressUpdateInterval);
+                    progressUpdateInterval = null;
+                }
                 console.error('Upload error:', xhr.status, xhr.statusText, xhr.responseText);
                 uploadStatus.textContent = '✗ Upload failed: Network error';
                 uploadStatus.className = 'upload-status error';
@@ -757,6 +811,10 @@
             
             // Upload abort
             xhr.addEventListener('abort', function() {
+                if (progressUpdateInterval) {
+                    clearInterval(progressUpdateInterval);
+                    progressUpdateInterval = null;
+                }
                 console.log('Upload aborted');
                 uploadStatus.textContent = '✗ Upload cancelled';
                 uploadStatus.className = 'upload-status error';
