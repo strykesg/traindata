@@ -1,0 +1,91 @@
+================================================================================
+TORCH.INT1 ERROR - FIX INSTRUCTIONS FOR A100 SXM4
+================================================================================
+
+PROBLEM:
+--------
+You're getting: AttributeError: module 'torch' has no attribute 'int1'
+
+This happens because torchao (a dependency of transformers) requires PyTorch 
+2.5.1+ which has torch.int1 support. Your environment has an older PyTorch.
+
+SOLUTION:
+---------
+Run this on your vast.ai instance:
+
+    cd /workspace/traindata/unsloth
+    source venv/bin/activate
+    source .env
+    bash fix_torch.sh
+
+This will:
+1. Uninstall old PyTorch
+2. Install PyTorch 2.5.1 with CUDA 12.1
+3. Reinstall unsloth with compatible dependencies
+4. Verify everything works
+
+VERIFY THE FIX:
+---------------
+After running fix_torch.sh, check your environment:
+
+    python check_env.py
+
+You should see all green checkmarks including:
+✅ PyTorch 2.5.1
+✅ CUDA available
+✅ torch.int1 supported (torchao compatible)
+
+START TRAINING:
+---------------
+Once verification passes:
+
+    python train.py
+
+ALTERNATIVE - CUDA 12.4:
+------------------------
+If CUDA 12.1 doesn't work, try CUDA 12.4:
+
+    bash fix_torch_cu124.sh
+
+OTHER USEFUL COMMANDS:
+----------------------
+Check versions:         bash check_versions.sh
+Full environment check: python check_env.py
+Read quick fix guide:   cat QUICKFIX.md
+
+MANUAL FIX (if scripts fail):
+-----------------------------
+pip uninstall -y torch torchvision torchaudio
+pip install torch==2.5.1 torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
+pip install --upgrade --force-reinstall --no-deps unsloth[colab-new] @ git+https://github.com/unslothai/unsloth.git
+pip install transformers>=4.51.0 accelerate bitsandbytes peft trl datasets
+
+WHAT I'VE UPDATED:
+------------------
+✓ requirements.txt - Updated to specify PyTorch installation order
+✓ setup_vast.sh - Now installs PyTorch 2.5.1 explicitly
+✓ README.md - Added troubleshooting section for this error
+✓ fix_torch.sh - Script to fix existing installations (CUDA 12.1)
+✓ fix_torch_cu124.sh - Alternative fix script (CUDA 12.4)
+✓ check_env.py - Environment verification script
+✓ check_versions.sh - Quick version check script
+✓ QUICKFIX.md - Detailed fix guide
+✓ This file - Instructions summary
+
+FILES TO UPLOAD TO VAST.AI:
+---------------------------
+All files in the unsloth/ directory, especially:
+- fix_torch.sh (the main fix script)
+- fix_torch_cu124.sh (alternative fix)
+- check_env.py (verification script)
+- requirements.txt (updated)
+- setup_vast.sh (updated)
+
+NEED HELP?
+----------
+1. Check QUICKFIX.md for detailed explanation
+2. Run check_env.py to diagnose issues
+3. Check README.md troubleshooting section
+
+================================================================================
+

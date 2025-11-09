@@ -52,7 +52,17 @@ if [ -d "venv" ]; then
     source venv/bin/activate
 fi
 
+# Fix torchao compatibility if needed
+echo ""
+echo "Checking torchao compatibility..."
+python fix_torchao.py
+if [ $? -ne 0 ]; then
+    echo "Warning: Could not patch torchao automatically"
+    echo "You may need to run: python fix_torchao.py manually"
+fi
+
 # Run training
+echo ""
 echo "Starting training..."
 python train.py
 
