@@ -73,6 +73,16 @@ pip install -r requirements.txt
 echo "Verifying installation..."
 python -c "import torch; print(f'PyTorch version: {torch.__version__}'); print(f'CUDA available: {torch.cuda.is_available()}'); print(f'CUDA device: {torch.cuda.get_device_name(0) if torch.cuda.is_available() else \"N/A\"}')"
 
+# Apply torchao compatibility patch
+echo ""
+echo "Applying torchao compatibility patch..."
+python fix_torchao.py
+if [ $? -eq 0 ]; then
+    echo "✓ Compatibility patch applied successfully"
+else
+    echo "Note: Patch will be applied automatically when you run training"
+fi
+
 echo ""
 echo "=========================================="
 echo "Setup complete!"

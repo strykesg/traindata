@@ -152,34 +152,21 @@ response = tokenizer.decode(outputs[0], skip_special_tokens=True)
 
 ### AttributeError: module 'torch' has no attribute 'int1'
 
-This error occurs when PyTorch version is too old for the `torchao` dependency. 
+This error occurs with certain PyTorch builds where `torchao` expects `torch.int1`/`int2`/etc types that don't exist.
 
-**Quick Fix:**
+**Automatic Fix:**
+The `setup_vast.sh` and `quickstart.sh` scripts automatically apply the fix. If you encounter this error:
+
 ```bash
-# Activate your venv if not already active
-source venv/bin/activate
-
-# Run the fix script (CUDA 12.1)
-bash fix_torch.sh
-
-# Or for CUDA 12.4
-bash fix_torch_cu124.sh
+python fix_torchao.py
 ```
 
-**Manual Fix:**
-```bash
-# Uninstall old PyTorch
-pip uninstall -y torch torchvision torchaudio
+This patches the torchao library to handle missing int types gracefully. Run it once after installation.
 
-# Install PyTorch 2.5.1 with CUDA 12.1
-pip install torch==2.5.1 torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
-
-# Or for CUDA 12.4
-pip install torch==2.5.1 torchvision torchaudio --index-url https://download.pytorch.org/whl/cu124
-
-# Reinstall unsloth
-pip install --upgrade --force-reinstall unsloth[colab-new] @ git+https://github.com/unslothai/unsloth.git
-```
+**What it does:**
+- Locates your torchao installation
+- Patches `quant_primitives.py` to only use int types that exist in your PyTorch build
+- Safe to run multiple times (checks if already patched)
 
 ### Out of Memory
 - Reduce `BATCH_SIZE`

@@ -34,8 +34,7 @@ pip install torch==2.5.1 torchvision torchaudio --index-url https://download.pyt
 # Reinstall unsloth and dependencies (they may have been affected)
 echo ""
 echo "Step 3: Reinstalling unsloth and dependencies..."
-pip install --upgrade --force-reinstall --no-deps unsloth[colab-new] @ git+https://github.com/unslothai/unsloth.git
-pip install transformers>=4.51.0 accelerate bitsandbytes peft trl datasets
+pip install --upgrade --force-reinstall "unsloth[colab-new] @ git+https://github.com/unslothai/unsloth.git"
 
 # Verify installation
 echo ""
