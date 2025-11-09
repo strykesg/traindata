@@ -3,6 +3,7 @@
 Model Upload and Management UI for llama.cpp server
 """
 import os
+import sys
 import requests
 from pathlib import Path
 from flask import Flask, render_template, request, jsonify, redirect, url_for, flash
@@ -13,6 +14,7 @@ app.secret_key = os.environ.get('SECRET_KEY', 'your-secret-key-change-in-product
 
 # Configure max file size (10GB for large models)
 app.config['MAX_CONTENT_LENGTH'] = 10 * 1024 * 1024 * 1024  # 10GB
+app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0  # Disable caching for debugging
 
 MODELS_DIR = Path(os.environ.get('MODELS_DIR', '/app/models'))
 LLAMA_SERVER_URL = os.environ.get('LLAMA_SERVER_URL', 'http://llama-server:8080')
@@ -91,46 +93,85 @@ def index():
 @app.route('/upload', methods=['POST'])
 def upload_model():
     """Upload a new model"""
+    print(f"\n{'='*50}")
+    print("UPLOAD REQUEST RECEIVED")
+    print(f"{'='*50}")
+    print(f"MODELS_DIR: {MODELS_DIR}")
+    print(f"MODELS_DIR exists: {MODELS_DIR.exists()}")
+    print(f"MODELS_DIR is writable: {os.access(MODELS_DIR, os.W_OK)}")
+    
     if 'file' not in request.files:
+        print("✗ No file in request.files")
         flash('No file provided', 'error')
         return redirect(url_for('index'))
     
     file = request.files['file']
+    print(f"File object: {file}")
+    print(f"File filename: {file.filename}")
+    print(f"File content_type: {file.content_type}")
     
     if file.filename == '':
+        print("✗ Empty filename")
         flash('No file selected', 'error')
         return redirect(url_for('index'))
     
     if not allowed_file(file.filename):
+        print(f"✗ Invalid file type: {file.filename}")
         flash('Only .gguf files are allowed', 'error')
         return redirect(url_for('index'))
     
     filename = secure_filename(file.filename)
     filepath = MODELS_DIR / filename
     
+    print(f"Secure filename: {filename}")
+    print(f"Target path: {filepath}")
+    
     # Check if file already exists
     if filepath.exists():
+        existing_size = filepath.stat().st_size
+        print(f"⚠️  File already exists: {existing_size} bytes")
         flash(f'Model {filename} already exists', 'warning')
         return redirect(url_for('index'))
     
     try:
         # Ensure directory exists
         MODELS_DIR.mkdir(parents=True, exist_ok=True)
+        print(f"✓ Directory ensured: {MODELS_DIR}")
+        
+        # Get file size before saving
+        file.seek(0, os.SEEK_END)
+        file_size = file.tell()
+        file.seek(0)
+        print(f"File size: {file_size} bytes ({file_size / (1024**3):.2f} GB)")
         
         # Save file
+        print(f"Saving to: {filepath}")
+        sys.stdout.flush()  # Ensure logs are visible immediately
         file.save(str(filepath))
+        print(f"✓ File.save() completed")
+        sys.stdout.flush()
         
         # Verify file was saved
         if not filepath.exists():
+            print(f"✗ File does not exist after save!")
             flash(f'Upload failed: File was not saved', 'error')
             return redirect(url_for('index'))
         
-        # Get file size
-        file_size = filepath.stat().st_size
-        flash(f'Model {filename} uploaded successfully! ({file_size / (1024**3):.2f} GB)', 'success')
+        # Get actual saved file size
+        saved_size = filepath.stat().st_size
+        print(f"✓ File saved successfully!")
+        print(f"  Path: {filepath}")
+        print(f"  Size: {saved_size} bytes ({saved_size / (1024**3):.2f} GB)")
+        print(f"  Expected: {file_size} bytes")
         
-        # Log for debugging
-        print(f"✓ Uploaded: {filepath} ({file_size} bytes)")
+        if saved_size != file_size:
+            print(f"⚠️  Size mismatch! Expected {file_size}, got {saved_size}")
+        
+        # Verify file is readable
+        if not os.access(filepath, os.R_OK):
+            print(f"⚠️  File is not readable!")
+        
+        flash(f'Model {filename} uploaded successfully! ({saved_size / (1024**3):.2f} GB)', 'success')
         
     except Exception as e:
         import traceback
@@ -139,6 +180,7 @@ def upload_model():
         print(traceback.format_exc())
         flash(error_msg, 'error')
     
+    print(f"{'='*50}\n")
     return redirect(url_for('index'))
 
 
@@ -196,7 +238,29 @@ def delete_model(model_name):
 @app.route('/api/models')
 def api_models():
     """API endpoint for model list"""
-    return jsonify({'models': get_models()})
+    models = get_models()
+    print(f"API: Returning {len(models)} models")
+    return jsonify({'models': models})
+
+
+@app.route('/api/verify/<model_name>')
+def verify_model(model_name):
+    """Verify if a model file exists"""
+    model_path = MODELS_DIR / secure_filename(model_name)
+    exists = model_path.exists()
+    info = {}
+    if exists:
+        stat = model_path.stat()
+        info = {
+            'exists': True,
+            'size': stat.st_size,
+            'size_gb': f"{stat.st_size / (1024**3):.2f}",
+            'readable': os.access(model_path, os.R_OK)
+        }
+    else:
+        info = {'exists': False}
+    
+    return jsonify(info)
 
 
 @app.route('/api/server/status')

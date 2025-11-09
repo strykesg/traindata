@@ -670,16 +670,40 @@
             // Upload complete
             xhr.addEventListener('load', function() {
                 if (xhr.status === 200 || xhr.status === 302) {
-                    // Success
+                    // Success - verify file was actually saved
                     progressBar.style.width = '100%';
                     progressPercentage.textContent = '100%';
-                    uploadStatus.textContent = '✓ Upload complete! Redirecting...';
-                    uploadStatus.className = 'upload-status success';
+                    uploadStatus.textContent = '✓ Upload complete! Verifying...';
+                    uploadStatus.className = 'upload-status uploading';
                     
-                    // Redirect after short delay
+                    // Verify the file exists
+                    const verifyFilename = file.name;
                     setTimeout(function() {
-                        window.location.href = '/';
-                    }, 1500);
+                        fetch(`/api/verify/${encodeURIComponent(verifyFilename)}`)
+                            .then(response => response.json())
+                            .then(data => {
+                                if (data.exists) {
+                                    uploadStatus.textContent = `✓ Upload verified! File: ${data.size_gb} GB. Redirecting...`;
+                                    uploadStatus.className = 'upload-status success';
+                                    setTimeout(function() {
+                                        window.location.href = '/';
+                                    }, 1000);
+                                } else {
+                                    uploadStatus.textContent = '⚠️ Upload completed but file not found. Check server logs.';
+                                    uploadStatus.className = 'upload-status error';
+                                    uploadBtn.disabled = false;
+                                    uploadBtn.textContent = 'Upload Model';
+                                }
+                            })
+                            .catch(error => {
+                                console.error('Verification error:', error);
+                                uploadStatus.textContent = '✓ Upload complete! (Verification failed, but upload may have succeeded)';
+                                uploadStatus.className = 'upload-status success';
+                                setTimeout(function() {
+                                    window.location.href = '/';
+                                }, 1500);
+                            });
+                    }, 500);
                 } else if (xhr.status === 413) {
                     // File too large
                     uploadStatus.textContent = '✗ File too large! Maximum size is 10GB.';
