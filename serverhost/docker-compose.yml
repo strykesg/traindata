@@ -1,12 +1,18 @@
 version: '3.8'
 
+# IMPORTANT: Before starting, ensure models directory exists:
+#   ./ensure-models-dir.sh
+# Or manually: mkdir -p ./models && chmod 755 ./models
+
 services:
   # llama.cpp server with built-in WebUI (CPU-only)
   llama-server:
     image: ghcr.io/ggerganov/llama.cpp:server
     container_name: llama-cpp-server
     volumes:
-      - ./models:/models:rw  # Models directory (rw so it can see newly uploaded files)
+      - ./models:/models:rw  # Models directory (bind mount for host access)
+    tmpfs:
+      - /tmp  # Use tmpfs for temporary files to avoid disk I/O issues
     environment:
       - LLAMA_MODEL_PATH=/models/qwen3-1.7b-trading-Q4_K_M.gguf
     command:
@@ -61,7 +67,9 @@ services:
     build: ./upload-ui
     container_name: model-upload-ui
     volumes:
-      - ./models:/app/models:rw  # Read-write access to models (explicit rw)
+      - ./models:/app/models:rw  # Same bind mount as llama-server (ensures both see same files)
+    tmpfs:
+      - /tmp  # Use tmpfs for temporary files
     environment:
       - MODELS_DIR=/app/models
       - LLAMA_SERVER_URL=http://llama-server:8080
@@ -77,8 +85,8 @@ services:
     init: true
 
 volumes:
-  models:
-    driver: local
+  # Note: models directory uses bind mount (./models) for direct host access
+  # This allows easy model management from the host filesystem
 
 networks:
   default:

@@ -27,13 +27,41 @@ def initialize_models_directory():
     print("Upload UI Initialization")
     print(f"{'='*60}")
     
-    # Ensure directory exists
-    try:
-        MODELS_DIR.mkdir(parents=True, exist_ok=True)
-        print(f"✓ Models directory ensured: {MODELS_DIR}")
-    except Exception as e:
-        print(f"✗ Failed to create models directory: {e}")
-        sys.exit(1)
+    # Ensure directory exists with retries (handles mount timing issues)
+    max_retries = 5
+    retry_delay = 2
+    for attempt in range(max_retries):
+        try:
+            MODELS_DIR.mkdir(parents=True, exist_ok=True)
+            
+            # Verify directory is actually accessible (not just created)
+            if MODELS_DIR.exists() and MODELS_DIR.is_dir():
+                # Try to write a test file to ensure mount is working
+                test_file = MODELS_DIR / '.mount_test'
+                try:
+                    test_file.write_text('test')
+                    test_file.unlink()
+                    print(f"✓ Models directory ensured and writable: {MODELS_DIR}")
+                    break
+                except Exception as test_error:
+                    if attempt < max_retries - 1:
+                        print(f"⚠️  Mount test failed (attempt {attempt + 1}/{max_retries}): {test_error}")
+                        import time
+                        time.sleep(retry_delay)
+                        continue
+                    else:
+                        print(f"✗ Mount test failed after {max_retries} attempts: {test_error}")
+                        print(f"⚠️  Directory may not be properly mounted. Continuing anyway...")
+            else:
+                raise Exception(f"Directory {MODELS_DIR} exists but is not a directory")
+        except Exception as e:
+            if attempt < max_retries - 1:
+                print(f"⚠️  Failed to create models directory (attempt {attempt + 1}/{max_retries}): {e}")
+                import time
+                time.sleep(retry_delay)
+            else:
+                print(f"✗ Failed to create models directory after {max_retries} attempts: {e}")
+                sys.exit(1)
     
     # Check write permissions
     if not os.access(MODELS_DIR, os.W_OK):
@@ -46,8 +74,11 @@ def initialize_models_directory():
         existing_models = list(MODELS_DIR.glob('*.gguf'))
         print(f"✓ Found {len(existing_models)} existing model(s):")
         for model in existing_models:
-            size = model.stat().st_size
-            print(f"  - {model.name} ({size / (1024**3):.2f} GB)")
+            try:
+                size = model.stat().st_size
+                print(f"  - {model.name} ({size / (1024**3):.2f} GB)")
+            except Exception as e:
+                print(f"  - {model.name} (error reading size: {e})")
     except Exception as e:
         print(f"⚠️  Error listing models: {e}")
     
@@ -123,10 +154,19 @@ def check_llama_server_health():
 def index():
     """Main page - model management"""
     # Re-verify models directory on each request (ensures persistence)
+    # This is critical - if the mount fails, we need to detect it
     try:
         MODELS_DIR.mkdir(parents=True, exist_ok=True)
+        # Verify mount is actually working by checking if we can access the directory
+        if not MODELS_DIR.exists() or not MODELS_DIR.is_dir():
+            print(f"⚠️  CRITICAL: Models directory mount appears broken!")
+            print(f"   Path: {MODELS_DIR}")
+            print(f"   Exists: {MODELS_DIR.exists()}")
+            print(f"   Is dir: {MODELS_DIR.is_dir() if MODELS_DIR.exists() else 'N/A'}")
     except Exception as e:
         print(f"⚠️  Warning: Could not ensure models directory: {e}")
+        import traceback
+        print(traceback.format_exc())
     
     models = get_models()
     server_healthy = check_llama_server_health()
@@ -147,8 +187,32 @@ def upload_model():
     print("UPLOAD REQUEST RECEIVED")
     print(f"{'='*50}")
     print(f"MODELS_DIR: {MODELS_DIR}")
-    print(f"MODELS_DIR exists: {MODELS_DIR.exists()}")
-    print(f"MODELS_DIR is writable: {os.access(MODELS_DIR, os.W_OK)}")
+    
+    # CRITICAL: Verify directory exists and is accessible BEFORE proceeding
+    try:
+        MODELS_DIR.mkdir(parents=True, exist_ok=True)
+        if not MODELS_DIR.exists():
+            raise Exception(f"Directory {MODELS_DIR} does not exist after mkdir")
+        if not MODELS_DIR.is_dir():
+            raise Exception(f"{MODELS_DIR} exists but is not a directory")
+        
+        # Test write access
+        test_file = MODELS_DIR / '.upload_test'
+        try:
+            test_file.write_text('test')
+            test_file.unlink()
+        except Exception as test_error:
+            raise Exception(f"Cannot write to directory {MODELS_DIR}: {test_error}")
+        
+        print(f"MODELS_DIR exists: {MODELS_DIR.exists()}")
+        print(f"MODELS_DIR is writable: {os.access(MODELS_DIR, os.W_OK)}")
+    except Exception as dir_error:
+        error_msg = f"CRITICAL: Models directory is not accessible: {dir_error}"
+        print(f"✗ {error_msg}")
+        import traceback
+        print(traceback.format_exc())
+        flash(f'Upload failed: {error_msg}. Please check Docker volume mount.', 'error')
+        return redirect(url_for('index'))
     
     if 'file' not in request.files:
         print("✗ No file in request.files")

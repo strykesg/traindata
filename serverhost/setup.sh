@@ -75,16 +75,32 @@ fi
 echo -e "${GREEN}✓ Docker is installed${NC}"
 echo ""
 
-echo "Step 4: Building and starting services..."
+echo "Step 4: Ensuring models directory exists..."
+if [ -f "./ensure-models-dir.sh" ]; then
+    bash ./ensure-models-dir.sh
+else
+    mkdir -p ./models
+    chmod 755 ./models
+    echo "✓ Created models directory"
+fi
+
+echo ""
+echo "Step 5: Building and starting services..."
 docker compose up -d --build
 
 echo ""
-echo "Step 5: Waiting for services to start..."
+echo "Step 6: Waiting for services to start..."
 sleep 5
 
 # Check if services are running
 if docker compose ps | grep -q "Up"; then
     echo -e "${GREEN}✓ Services are running${NC}"
+    echo ""
+    echo "Verifying models directory in containers..."
+    echo "Upload UI:"
+    docker compose exec -T upload-ui ls -la /app/models 2>/dev/null | head -5 || echo "  (checking...)"
+    echo "Llama Server:"
+    docker compose exec -T llama-server ls -la /models 2>/dev/null | head -5 || echo "  (checking...)"
 else
     echo -e "${RED}✗ Services failed to start${NC}"
     echo "Check logs with: docker compose logs"
