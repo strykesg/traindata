@@ -193,43 +193,61 @@ def upload_model():
         file_size = file.tell()
         file.seek(0)
         print(f"File size: {file_size} bytes ({file_size / (1024**3):.2f} GB)")
-        
-        # Save file with explicit persistence
-        print(f"Saving to: {filepath}")
         sys.stdout.flush()
         
-        # Use chunked writing for large files to ensure persistence
-        CHUNK_SIZE = 1024 * 1024  # 1MB chunks
-        written = 0
+        # Save file - use Flask's save method which handles FileStorage correctly
+        print(f"Saving to: {filepath}")
+        print(f"Starting save operation...")
+        sys.stdout.flush()
         
         try:
-            with open(filepath, 'wb') as f:
-                while True:
-                    chunk = file.read(CHUNK_SIZE)
-                    if not chunk:
-                        break
-                    f.write(chunk)
-                    written += len(chunk)
-                    # Flush every 100MB to ensure persistence
-                    if written % (100 * 1024 * 1024) == 0:
-                        f.flush()
-                        os.fsync(f.fileno())
-                        print(f"  Progress: {written / (1024**3):.2f} GB written...")
-                        sys.stdout.flush()
+            # Reset file pointer to beginning
+            file.seek(0)
             
-            # Final sync to ensure all data is written to disk
-            fd = os.open(str(filepath), os.O_RDONLY)
-            try:
-                os.fsync(fd)
-            finally:
-                os.close(fd)
-            print(f"✓ File.save() completed with explicit persistence")
+            # Use Flask's save method (handles FileStorage correctly)
+            # This should complete before we continue
+            print(f"Calling file.save()...")
             sys.stdout.flush()
+            file.save(str(filepath))
+            print(f"✓ file.save() returned")
+            sys.stdout.flush()
+            
+            # Small delay to ensure filesystem has updated
+            import time
+            time.sleep(0.5)
+            
+            # Verify immediately
+            if not filepath.exists():
+                print(f"✗ File does not exist immediately after save!")
+                sys.stdout.flush()
+                flash(f'Upload failed: File was not saved', 'error')
+                return redirect(url_for('index'))
+            
+            print(f"✓ File exists after save")
+            sys.stdout.flush()
+            
+            # Ensure file is written to disk
+            try:
+                fd = os.open(str(filepath), os.O_RDONLY)
+                os.fsync(fd)
+                os.close(fd)
+                print(f"✓ File synced to disk")
+                sys.stdout.flush()
+            except Exception as sync_error:
+                print(f"⚠️  Could not sync file (non-critical): {sync_error}")
+                sys.stdout.flush()
+            
         except Exception as save_error:
+            import traceback
+            print(f"✗ Save error occurred:")
+            print(traceback.format_exc())
+            sys.stdout.flush()
             # Clean up partial file on error
             if filepath.exists():
                 try:
                     filepath.unlink()
+                    print(f"✗ Removed partial file due to error")
+                    sys.stdout.flush()
                 except:
                     pass
             raise save_error
