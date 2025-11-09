@@ -1,0 +1,23 @@
+# Unsloth and core dependencies
+unsloth[colab-new] @ git+https://github.com/unslothai/unsloth.git
+transformers>=4.51.0
+torch>=2.0.0
+accelerate>=0.21.0
+bitsandbytes>=0.41.0
+peft>=0.6.0
+trl>=0.7.0
+datasets>=2.14.0
+
+# WandB for logging
+wandb>=0.15.0
+
+# HuggingFace Hub
+huggingface-hub>=0.17.0
+
+# Environment variables
+python-dotenv>=1.0.0
+
+# Additional utilities
+sentencepiece>=0.1.99
+protobuf>=3.20.0
+

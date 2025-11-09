@@ -42,6 +42,21 @@ python main.py export
 
 Or use the web UI download buttons after export.
 
+## Fine-tuning with Unsloth
+
+After generating training data, fine-tune Qwen3-1.7B using Unsloth on vast.ai or Colab.
+
+See [`unsloth/README.md`](unsloth/README.md) for detailed instructions.
+
+Quick start:
+```bash
+cd unsloth
+export HF_TOKEN="your_huggingface_token"
+export WANDB_API_KEY="your_wandb_key"
+export DATA_DIR="output"  # Use generated training data
+python train.py
+```
+
 ## Docker Deployment
 
 ### Using Docker Compose (Dokploy-compatible)

@@ -1,0 +1,50 @@
+# Fine-tuning Configuration
+model:
+  name: "Qwen/Qwen3-1.7B"
+  max_seq_length: 2048
+  load_in_4bit: true
+
+# LoRA Configuration
+lora:
+  r: 16
+  alpha: 16
+  dropout: 0
+  target_modules:
+    - "q_proj"
+    - "k_proj"
+    - "v_proj"
+    - "o_proj"
+    - "gate_proj"
+    - "up_proj"
+    - "down_proj"
+
+# Training Configuration
+training:
+  batch_size: 4
+  gradient_accumulation_steps: 4
+  num_epochs: 3
+  learning_rate: 2e-4
+  warmup_steps: 50
+  weight_decay: 0.01
+  lr_scheduler_type: "linear"
+  optim: "adamw_8bit"
+
+# Logging and Saving
+logging:
+  logging_steps: 10
+  save_steps: 500
+  eval_steps: 500
+  report_to: "wandb"
+
+# Data Configuration
+data:
+  train_file: "egdata/train.jsonl"  # Change to "output/train.jsonl" for production
+  val_file: "egdata/val.jsonl"      # Change to "output/val.jsonl" for production
+  test_file: "egdata/test.jsonl"    # Not used in training
+
+# Output Configuration
+output:
+  dir: "output_model"
+  push_to_hub: true  # Set to false to skip HuggingFace upload
+  hub_model_id: null  # Auto-generated if null: {HF_USERNAME}/qwen3-1.7b-trading-bot
+

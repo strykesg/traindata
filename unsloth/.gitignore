@@ -1,0 +1,49 @@
+# Model outputs
+output_model/
+*.safetensors
+*.bin
+*.pt
+*.pth
+
+# WandB
+wandb/
+.wandb/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+.venv
+
+# Data (keep structure, ignore actual data files in root)
+*.jsonl
+# But allow data directory files to be committed
+!data/*.jsonl
+!egdata/*.jsonl  # Keep example data
+
+# Environment
+.env
+.env.local
+# But allow .env.example
+!.env.example
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Logs
+*.log
+logs/
+
+# Checkpoints
+checkpoints/
+checkpoint-*/
+
