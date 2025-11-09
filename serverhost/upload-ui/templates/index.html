@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>llama.cpp Model Manager</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        .header {
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            margin-bottom: 20px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+        }
+        
+        .header h1 {
+            color: #333;
+            font-size: 32px;
+            margin-bottom: 10px;
+        }
+        
+        .header p {
+            color: #666;
+            font-size: 16px;
+        }
+        
+        .status-badge {
+            display: inline-block;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 600;
+            margin-top: 10px;
+        }
+        
+        .status-healthy {
+            background: #10b981;
+            color: white;
+        }
+        
+        .status-unhealthy {
+            background: #ef4444;
+            color: white;
+        }
+        
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            margin-bottom: 20px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+        }
+        
+        .card h2 {
+            color: #333;
+            font-size: 24px;
+            margin-bottom: 20px;
+        }
+        
+        .upload-section {
+            border: 3px dashed #ddd;
+            border-radius: 8px;
+            padding: 40px;
+            text-align: center;
+            transition: all 0.3s;
+        }
+        
+        .upload-section:hover {
+            border-color: #667eea;
+            background: #f9fafb;
+        }
+        
+        .upload-section input[type="file"] {
+            display: none;
+        }
+        
+        .upload-label {
+            display: inline-block;
+            padding: 12px 32px;
+            background: #667eea;
+            color: white;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+        
+        .upload-label:hover {
+            background: #764ba2;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+        }
+        
+        .upload-btn {
+            display: inline-block;
+            padding: 12px 32px;
+            background: #10b981;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 16px;
+            margin-top: 20px;
+            transition: all 0.3s;
+        }
+        
+        .upload-btn:hover {
+            background: #059669;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(16, 185, 129, 0.4);
+        }
+        
+        .upload-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .models-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+        
+        .model-card {
+            background: #f9fafb;
+            border-radius: 8px;
+            padding: 20px;
+            border: 2px solid #e5e7eb;
+            transition: all 0.3s;
+        }
+        
+        .model-card:hover {
+            border-color: #667eea;
+            transform: translateY(-5px);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        }
+        
+        .model-card.active {
+            border-color: #10b981;
+            background: #f0fdf4;
+        }
+        
+        .model-name {
+            font-weight: 600;
+            color: #333;
+            font-size: 18px;
+            margin-bottom: 8px;
+            word-break: break-all;
+        }
+        
+        .model-size {
+            color: #666;
+            font-size: 14px;
+            margin-bottom: 15px;
+        }
+        
+        .model-actions {
+            display: flex;
+            gap: 10px;
+        }
+        
+        .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: all 0.3s;
+            flex: 1;
+        }
+        
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background: #764ba2;
+        }
+        
+        .btn-danger {
+            background: #ef4444;
+            color: white;
+        }
+        
+        .btn-danger:hover {
+            background: #dc2626;
+        }
+        
+        .btn-success {
+            background: #10b981;
+            color: white;
+        }
+        
+        .active-badge {
+            display: inline-block;
+            background: #10b981;
+            color: white;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+            margin-bottom: 10px;
+        }
+        
+        .alert {
+            padding: 15px 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-weight: 500;
+        }
+        
+        .alert-success {
+            background: #d1fae5;
+            color: #065f46;
+            border-left: 4px solid #10b981;
+        }
+        
+        .alert-error {
+            background: #fee2e2;
+            color: #991b1b;
+            border-left: 4px solid #ef4444;
+        }
+        
+        .alert-warning {
+            background: #fef3c7;
+            color: #92400e;
+            border-left: 4px solid #f59e0b;
+        }
+        
+        .quick-links {
+            display: flex;
+            gap: 15px;
+            margin-top: 20px;
+        }
+        
+        .quick-link {
+            display: inline-block;
+            padding: 12px 24px;
+            background: #667eea;
+            color: white;
+            text-decoration: none;
+            border-radius: 8px;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+        
+        .quick-link:hover {
+            background: #764ba2;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+        }
+        
+        .file-name {
+            margin-top: 10px;
+            color: #666;
+            font-style: italic;
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+        
+        .empty-state svg {
+            width: 64px;
+            height: 64px;
+            margin-bottom: 20px;
+            opacity: 0.5;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <h1>🦙 llama.cpp Model Manager</h1>
+            <p>Upload, manage, and deploy GGUF models for your llama.cpp server</p>
+            <span class="status-badge {{ 'status-healthy' if server_healthy else 'status-unhealthy' }}">
+                {{ '● Server Online' if server_healthy else '● Server Offline' }}
+            </span>
+            <div class="quick-links">
+                <a href="{{ llama_url }}" target="_blank" class="quick-link">
+                    🚀 Open llama.cpp WebUI
+                </a>
+                <a href="#" onclick="location.reload()" class="quick-link">
+                    🔄 Refresh Status
+                </a>
+            </div>
+        </div>
+        
+        <!-- Flash Messages -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }}">
+                        {{ message }}
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+        
+        <!-- Upload Section -->
+        <div class="card">
+            <h2>📤 Upload New Model</h2>
+            <form action="/upload" method="post" enctype="multipart/form-data" id="uploadForm">
+                <div class="upload-section">
+                    <input type="file" name="file" id="fileInput" accept=".gguf" required>
+                    <label for="fileInput" class="upload-label">
+                        Choose GGUF File
+                    </label>
+                    <div class="file-name" id="fileName"></div>
+                </div>
+                <button type="submit" class="upload-btn" id="uploadBtn" disabled>
+                    Upload Model
+                </button>
+            </form>
+        </div>
+        
+        <!-- Models List -->
+        <div class="card">
+            <h2>📚 Available Models ({{ models|length }})</h2>
+            {% if models %}
+                <div class="models-grid">
+                    {% for model in models %}
+                        <div class="model-card {{ 'active' if model.is_active else '' }}">
+                            {% if model.is_active %}
+                                <div class="active-badge">✓ Active</div>
+                            {% endif %}
+                            <div class="model-name">{{ model.name }}</div>
+                            <div class="model-size">{{ model.size }}</div>
+                            <div class="model-actions">
+                                {% if not model.is_active %}
+                                    <button class="btn btn-primary" onclick="activateModel('{{ model.name }}')">
+                                        Activate
+                                    </button>
+                                    <button class="btn btn-danger" onclick="deleteModel('{{ model.name }}')">
+                                        Delete
+                                    </button>
+                                {% else %}
+                                    <button class="btn btn-success" disabled>
+                                        In Use
+                                    </button>
+                                {% endif %}
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <div class="empty-state">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    <h3>No models uploaded yet</h3>
+                    <p>Upload your first GGUF model to get started</p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+    
+    <script>
+        // File input handling
+        const fileInput = document.getElementById('fileInput');
+        const fileName = document.getElementById('fileName');
+        const uploadBtn = document.getElementById('uploadBtn');
+        
+        fileInput.addEventListener('change', function(e) {
+            if (e.target.files.length > 0) {
+                const file = e.target.files[0];
+                fileName.textContent = `Selected: ${file.name} (${(file.size / (1024**3)).toFixed(2)} GB)`;
+                uploadBtn.disabled = false;
+            } else {
+                fileName.textContent = '';
+                uploadBtn.disabled = true;
+            }
+        });
+        
+        // Activate model
+        function activateModel(modelName) {
+            if (confirm(`Activate model "${modelName}"?\n\nNote: You'll need to restart the llama-server container for this to take effect.`)) {
+                fetch(`/activate/${encodeURIComponent(modelName)}`, {
+                    method: 'POST'
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        alert(data.message);
+                        location.reload();
+                    } else {
+                        alert('Error: ' + (data.error || 'Unknown error'));
+                    }
+                })
+                .catch(error => {
+                    alert('Error: ' + error.message);
+                });
+            }
+        }
+        
+        // Delete model
+        function deleteModel(modelName) {
+            if (confirm(`Delete model "${modelName}"?\n\nThis action cannot be undone.`)) {
+                fetch(`/delete/${encodeURIComponent(modelName)}`, {
+                    method: 'POST'
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        alert(data.message);
+                        location.reload();
+                    } else {
+                        alert('Error: ' + (data.error || 'Unknown error'));
+                    }
+                })
+                .catch(error => {
+                    alert('Error: ' + error.message);
+                });
+            }
+        }
+        
+        // Form submission with loading state
+        document.getElementById('uploadForm').addEventListener('submit', function(e) {
+            uploadBtn.textContent = 'Uploading...';
+            uploadBtn.disabled = true;
+        });
+    </script>
+</body>
+</html>
+

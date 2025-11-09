@@ -1,0 +1,62 @@
+version: '3.8'
+
+services:
+  # llama.cpp server with built-in WebUI (CPU-only)
+  llama-server:
+    image: ghcr.io/ggerganov/llama.cpp:server
+    container_name: llama-cpp-server
+    ports:
+      - "8080:8080"  # llama-server with WebUI
+    volumes:
+      - ./models:/models:ro  # Read-only access to models
+    command: >
+      --host 0.0.0.0
+      --port 8080
+      -m /models/current.gguf
+      --ctx-size 4096
+      --threads 5
+      --threads-batch 5
+      --n-gpu-layers 0
+      --parallel 2
+      --cont-batching
+      --no-mmap
+      --mlock
+      --jinja
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '6'
+          memory: 7G
+        reservations:
+          cpus: '4'
+          memory: 4G
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Simple upload UI for managing models
+  upload-ui:
+    build: ./upload-ui
+    container_name: model-upload-ui
+    ports:
+      - "3000:3000"  # Upload UI
+    volumes:
+      - ./models:/app/models  # Read-write access to models
+    environment:
+      - MODELS_DIR=/app/models
+      - LLAMA_SERVER_URL=http://llama-server:8080
+    restart: unless-stopped
+    depends_on:
+      - llama-server
+
+volumes:
+  models:
+    driver: local
+
+networks:
+  default:
+    name: llama-network
+

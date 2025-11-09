@@ -1,0 +1,35 @@
+# Models directory (large files)
+models/*.gguf
+models/*.bin
+models/*.safetensors
+models/current.gguf
+
+# Keep the directory
+!models/.gitkeep
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+
+# Environment
+.env
+*.log
+
+# Docker
+.dockerignore
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
