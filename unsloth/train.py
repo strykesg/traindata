@@ -21,7 +21,7 @@ MODEL_NAME = "Qwen/Qwen3-1.7B"  # Fixed model
 DATA_DIR = Path("data")  # Fixed data directory
 OUTPUT_DIR = Path("output_model")
 MAX_SEQ_LENGTH = 2048
-BATCH_SIZE = 4  # Adjust based on GPU memory
+BATCH_SIZE = 8  # Adjust based on GPU memory
 GRADIENT_ACCUMULATION_STEPS = 4
 NUM_EPOCHS = 3
 LEARNING_RATE = 2e-4
@@ -107,7 +107,6 @@ def main():
     )
     
     # Set up tokenizer
-    tokenizer = FastLanguageModel.get_tokenizer(model)
     tokenizer.pad_token = tokenizer.eos_token
     tokenizer.padding_side = "right"
     
@@ -162,7 +161,7 @@ def main():
         output_dir=str(OUTPUT_DIR),
         save_strategy="steps",
         save_steps=SAVE_STEPS,
-        evaluation_strategy="steps" if val_dataset else "no",
+        eval_strategy="steps" if val_dataset else "no",
         eval_steps=EVAL_STEPS if val_dataset else None,
         report_to="wandb",
         load_best_model_at_end=True if val_dataset else False,
@@ -177,7 +176,7 @@ def main():
         eval_dataset=val_dataset,
         dataset_text_field="text",
         max_seq_length=MAX_SEQ_LENGTH,
-        packing=False,  # Set to True for better efficiency if sequences are short
+        packing=True,  # Set to True for better efficiency if sequences are short
         args=training_args,
     )
     
